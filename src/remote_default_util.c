@@ -1,3 +1,4 @@
+#include "remote_default_util.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <malloc.h>
@@ -12,7 +13,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "remote_default_util.h"
+struct RemoteDefaultNode *remote_default_list;
 
 int setup_socket() {
   int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -77,18 +78,25 @@ void send_packet(int sock, char *if_name, void *dst_addr, void *packet,
   if (sendto(sock, frame, frame_size, 0, (struct sockaddr *)&addr,
              sizeof(addr)) == -1) {
     printf("%s", strerror(errno));
+    free(frame);
     exit(errno);
   }
+  free(frame);
 }
 
 void request_default(int sock, char *if_name) {
   unsigned char ether_broadcast_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
   struct RemoteDefaultRequest request = RemoteDefaultRequest_grub;
   send_packet(sock, if_name, ether_broadcast_addr, &request, sizeof(request));
+  struct DataFrame frame;
+  while (strcmp(frame.packet.request.grub, request.grub) != 0) {
+    recvfrom(sock, &frame, sizeof(frame), 0, NULL, NULL);
+  }
+  printf("got default entry: %d", frame.packet.default_entry);
 }
 
 void listen_default(int sock, char *if_name) {
-  struct RequestPacket frame;
+  struct RequestFrame frame;
   struct RemoteDefaultRequest request = RemoteDefaultRequest_grub;
   while (strcmp(frame.request.grub, request.grub) != 0) {
     recvfrom(sock, &frame, sizeof(frame), 0, NULL, NULL);
@@ -98,6 +106,56 @@ void listen_default(int sock, char *if_name) {
     printf("%02X:", frame.hdr.h_source[i]);
   }
   printf("\n");
+  struct RemoteDefaultNode *node = remote_default_list;
+  while (node) {
+    if (memcmp(node->data.mac, frame.hdr.h_source, sizeof(node->data.mac)) ==
+        0) {
+      struct DataPacket return_packet = {"grub", node->data.default_entry};
+      send_packet(sock, if_name, node->data.mac, &return_packet,
+                  sizeof(return_packet));
+      printf("sent with default: %d", return_packet.default_entry);
+      break;
+    } else {
+      node = node->next;
+    }
+  }
+  // runs when break wasn't called in the for loop
+  if (node == NULL) {
+    printf("failed to find entry for mac address: ");
+    for (int i = 0; i < sizeof(frame.hdr.h_source); ++i) {
+      printf("%02X:", frame.hdr.h_source[i]);
+    }
+    printf("\n");
+    printf("list: \n");
+    node = remote_default_list;
+    while (node) {
+      for (int i = 0; i < sizeof(node->data.mac); ++i) {
+        printf("%02X:", node->data.mac[i]);
+      }
+      printf(" %x \n", node->data.default_entry);
+      node = node->next;
+    }
+    exit(1);
+  }
+}
+
+void load_defaults(int argc, char *argv[]) {
+  remote_default_list = malloc(sizeof(struct RemoteDefaultNode));
+  struct RemoteDefaultNode *node = remote_default_list;
+  for (int i = 3; i < argc;) {
+    memset(node, 0, sizeof(*node));
+    char *arg_mac = argv[i++];
+    int pos = 0;
+    for (int j = 0; j < sizeof(node->data.mac); ++j) {
+      sscanf(arg_mac + pos, "%2hhx", node->data.mac + j);
+      pos += 2;
+    }
+    sscanf(argv[i++], "%hhx", &node->data.default_entry);
+    node->next = malloc(sizeof(struct RemoteDefaultNode));
+  }
+  // free the extra allocation
+  free(node->next);
+  node->next = NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -108,10 +166,12 @@ int main(int argc, char *argv[]) {
     request_default(sock, if_name);
   } else if (strcmp(argv[2], "listen") == 0) {
     printf("listening for request \n");
+    load_defaults(argc, argv);
     listen_default(sock, if_name);
   } else {
-    printf(
-        "valid usage: ./remote_default_util interface_name [request/listen]");
+    printf("valid usage: ./remote_default_util interface_name request\n");
+    printf("valid usage: ./remote_default_util interface_name listen [[mac] "
+           "[default_entry]]...");
   }
   close(sock);
 }
