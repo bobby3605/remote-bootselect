@@ -7,6 +7,7 @@
 #include <grub/mm.h>
 #include <grub/net.h>
 #include <grub/net/ethernet.h>
+#include <grub/time.h>
 #include <grub/types.h>
 
 #define BOOTSELECT_ETHERTYPE 0x7184
@@ -33,105 +34,64 @@ static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd
                                              int argc __attribute__((unused)),
                                              char **args
                                              __attribute__((unused))) {
+
   if (grub_net_cards == NULL) {
-    grub_printf("failed to find any network cards\n");
+    grub_printf(
+        "Failed to find any network cards. Did you call insmod efinet ?\n");
     return 1;
   }
-  grub_printf("found cards\n");
-  /*
-  grub_printf("found cards\n");
-  struct grub_net_card *card = &grub_net_cards[0];
-  grub_printf("alloc netbuff\n");
-  struct grub_net_buff *nb = grub_netbuff_alloc(sizeof(struct RequestFrame));
-  struct RequestFrame *request = (struct RequestFrame *)nb;
-  const grub_uint8_t ether_broadcast_addr[] = {0xff, 0xff, 0xff,
-                                               0xff, 0xff, 0xff};
-  grub_printf("memcpy\n");
-  grub_memcpy(request->hdr.dst, ether_broadcast_addr, 6);
-  grub_memcpy(request->hdr.src, &card->default_address, 6);
-  grub_printf("type\n");
-  request->hdr.type = grub_cpu_to_be16(BOOTSELECT_ETHERTYPE);
-  */
 
-  grub_printf("alloc netbuff\n");
-  struct grub_net_buff nb;
-  grub_uint8_t packet_data[16];
-
-  /* Build a request packet.  */
-  nb.head = packet_data;
-  nb.end = packet_data + sizeof(packet_data);
-  grub_netbuff_clear(&nb);
-  grub_netbuff_reserve(&nb, 16);
-
-  grub_err_t err = grub_netbuff_push(&nb, sizeof(*packet_data));
-  if (err)
-    return err;
-
-  grub_printf("build params\n");
-  grub_net_link_level_address_t target_mac_addr;
-  target_mac_addr.mac[0] = 0xff;
-  target_mac_addr.mac[1] = 0xff;
-  target_mac_addr.mac[2] = 0xff;
-  target_mac_addr.mac[3] = 0xff;
-  target_mac_addr.mac[4] = 0xff;
-  target_mac_addr.mac[5] = 0xff;
-  struct grub_net_network_level_interface inf;
-  inf.card = &grub_net_cards[0];
-  inf.vlantag = 0;
-  inf.name = grub_xasprintf("%s:bootselect", inf.card->name);
-  grub_memcpy(&inf.hwaddress, &inf.card->default_address,
-              sizeof(inf.hwaddress));
-  grub_printf("send packet\n");
-  err = send_ethernet_packet(&inf, &nb, target_mac_addr, BOOTSELECT_ETHERTYPE);
-  if (err != 0) {
-    grub_printf("error sending packet\n");
-    return err;
-  }
-  grub_printf("sent packet\n");
-
-  struct grub_net_buff *response;
-  struct etherhdr hdr = {0};
-  grub_printf("waiting for response\n");
-  do {
-    response = inf.card->driver->recv(inf.card);
-    hdr = *(struct etherhdr *)response->data;
-    // grub_printf("received ethertype: %hx\n", hdr.type);
-    //   fflush(NULL);
-  } while (hdr.type != grub_cpu_to_be16(BOOTSELECT_ETHERTYPE));
-  grub_netbuff_pull(response, sizeof(struct etherhdr));
-  grub_uint8_t default_entry = *(grub_uint8_t *)response->data;
-  grub_printf("received ethertype: %hx\n", hdr.type);
-  grub_printf("received default: %u\n", default_entry);
-  return 0;
-  /* somehow this is an infinite loop
-  grub_printf("printing cards\n");
-  FOR_NET_CARDS(card) { grub_printf("card: %s \n", card->name); }
-  */
-
-  /*
-  grub_printf("card %s opening\n", card->name);
   grub_err_t err;
+  struct grub_net_card *card = &grub_net_cards[0];
+
   if (!card->opened) {
     err = GRUB_ERR_NONE;
     if (card->driver->open)
       err = card->driver->open(card);
-    if (err) {
-      grub_printf("error opening card: %x\n", err);
+    if (err)
       return err;
-    }
     card->opened = 1;
   }
-  grub_printf("card %s opened\n", card->name);
-  err = card->driver->send(card, nb);
-  if (err) {
-    grub_printf("error sending packet: %x", err);
-    return err;
-  } else {
-    grub_printf("data sent\n");
+
+  const grub_uint16_t ethertype = grub_cpu_to_be16(BOOTSELECT_ETHERTYPE);
+  const grub_uint8_t ether_broadcast_addr[] = {0xff, 0xff, 0xff,
+                                               0xff, 0xff, 0xff};
+
+  // create frame
+  struct RequestFrame request = {0};
+  grub_memcpy(request.hdr.dst, ether_broadcast_addr, 6);
+  grub_memcpy(request.hdr.src, &card->default_address.mac, 6);
+  request.hdr.type = ethertype;
+
+  // load frame into grub_net_buff
+  struct grub_net_buff *request_nb = grub_netbuff_alloc(sizeof(request));
+  grub_netbuff_push(request_nb, sizeof(request));
+  grub_memcpy(request_nb->data, &request, sizeof(request));
+
+  // send frame
+  card->driver->send(card, request_nb);
+  //  grub_netbuff_free(request_nb);
+
+  struct grub_net_buff *response;
+  struct etherhdr hdr = {0};
+  const grub_uint64_t timeout_ms = 2000;
+  grub_uint64_t limit_time = grub_get_time_ms() + timeout_ms;
+  do {
+    response = card->driver->recv(card);
+    hdr = *(struct etherhdr *)response->data;
+    if (limit_time < grub_get_time_ms()) {
+      grub_printf("timeout waiting for response\n");
+      break;
+    }
+  } while (hdr.type != ethertype);
+  if (hdr.type == ethertype) {
+    grub_netbuff_pull(response, sizeof(struct etherhdr));
+    grub_uint8_t default_entry = *(grub_uint8_t *)response->data;
+    grub_printf("received default: %u\n", default_entry);
     return 0;
+  } else {
+    return 1;
   }
-  return 1;
-  */
 }
 
 static grub_extcmd_t cmd;
