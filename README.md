@@ -1,4 +1,4 @@
-### remote-bootselect
+# remote-bootselect
 This program enables remotely setting the default boot option in grub.
 There is a server program and a grub module.
 This is currently alpha software and is not ready for real use.
@@ -14,7 +14,7 @@ It also has the capability to request default data. This is useful for debugging
 ```
 ./remote-bootselect-server interface_name request
 ```
-# Configuration:
+### Configuration:
 Create a file named 'config' in the same directory as remote-bootselect-server.
 Add entries to the file following this example:
 ```
@@ -27,7 +27,7 @@ Create one line per config entry
 
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
-# Installation:
+### Installation:
 ``` 
 cp remote-bootselect.mod /boot/grub/x86_64-efi/remote-bootselect.mod
 cp src/grub/01-remote-bootselect file to /etc/grub.d/01-remote-bootselect
@@ -42,15 +42,15 @@ then run:
 make
 ```
 This will build both the server and module and place them in build/
-# Dependencies:
+### Dependencies:
 ``` 
 gcc pkg-config m4 libtool automake autoconf bison flex
 ```
-# remote-bootselect-server
+### remote-bootselect-server
 ```
 make build/remote-bootselect-server
 ```
-# remote-bootselect.mod
+### remote-bootselect.mod
 Ensure you have the grub source:
 ```
 git submodule update --init --recursive
@@ -79,7 +79,7 @@ cp grub/grub-core/remote-bootselect.mod /boot/grub/x86_64-efi/remote-bootselect.
 ```
 
 ## Protocol:
-# Server:
+### Server:
 The server will listen for packets with ethertype 0x7184 (defined in src/server/remote-bootselect-server.h).
 A request packet has no data attached, so it is only a destination, source, and ethertype.
 The server will respond to the request with the following packet:
@@ -87,7 +87,7 @@ The server will respond to the request with the following packet:
 destination|source|ethertype|data
 request_source_mac|server_mac|ethertype|default_entry
 ```
-# Client:
+### Client:
 The client will send a request packet as described in the Server section to the broadcast mac address (ff:ff:ff:ff:ff:ff)
 The client will wait for packets with the destination as its mac address and the correct ethertype
 Once the client receives and verifies the packet, it will set the default entry and exit
