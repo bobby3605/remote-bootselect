@@ -1,3 +1,2 @@
-grub/
-grub-clean/
 config
+build/

@@ -3,6 +3,7 @@
 #include <net/ethernet.h>
 
 #define BOOTSELECT_ETHERTYPE 0x7184
+#define DEFAULT_ENTRY_MAX_LENGTH 64
 
 struct uint48 {
   uint64_t x : 48;
@@ -14,12 +15,12 @@ struct RequestFrame {
 
 struct DataFrame {
   struct ethhdr hdr;
-  unsigned char default_entry;
+  char default_entry[DEFAULT_ENTRY_MAX_LENGTH];
 };
 
 struct RemoteDefaultData {
   struct uint48 mac;
-  unsigned char default_entry;
+  char default_entry[DEFAULT_ENTRY_MAX_LENGTH];
 };
 
 struct RemoteDefaultEntries {

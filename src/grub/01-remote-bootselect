@@ -1,0 +1,3 @@
+insmod efinet
+insmod remote-bootselect
+remote-bootselect

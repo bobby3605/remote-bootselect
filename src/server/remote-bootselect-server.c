@@ -1,4 +1,4 @@
-#include "remote_default_util.h"
+#include "remote-bootselect-server.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <linux/filter.h>
@@ -150,7 +150,7 @@ void request_default(int sock, char *if_name) {
          0) {
     recvfrom(sock, &frame, sizeof(frame), 0, NULL, NULL);
   }
-  printf("got default entry: %d ", frame.default_entry);
+  printf("got default entry: %s ", frame.default_entry);
   printf("from: ");
   print_mac(frame.hdr.h_source);
   printf("\n");
@@ -173,7 +173,7 @@ void listen_default(int sock, char *if_name) {
       // sent the default entry packet for the mac address
       send_packet(sock, if_name, &data->mac, &data->default_entry,
                   sizeof(data->default_entry));
-      printf("sent default: %d", data->default_entry);
+      printf("sent default:%s\n", data->default_entry);
       sent = true;
       break;
     }
@@ -182,11 +182,11 @@ void listen_default(int sock, char *if_name) {
     printf("failed to find entry for mac address: ");
     print_mac(frame.hdr.h_source);
     printf("\n");
-    printf("entries: \n");
+    printf("entries:\n");
     for (int i = 0; i < remote_default_entries.size; ++i) {
       struct RemoteDefaultData *data = &remote_default_entries.data[i];
       print_mac(&data->mac);
-      printf(" %x \n", data->default_entry);
+      printf(" %s\n", data->default_entry);
     }
     exit(1);
   }
@@ -215,9 +215,9 @@ void load_defaults(char *filename) {
   for (int i = 0; i < remote_default_entries.size; ++i) {
     unsigned char *mac = (unsigned char *)&remote_default_entries.data[i].mac;
     sscanf(&file_buffer[i * line_size],
-           "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %hhx\n", &mac[0], &mac[1],
+           "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %s\n", &mac[0], &mac[1],
            &mac[2], &mac[3], &mac[4], &mac[5],
-           &remote_default_entries.data[i].default_entry);
+           remote_default_entries.data[i].default_entry);
   }
 }
 

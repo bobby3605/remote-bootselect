@@ -22,11 +22,9 @@ struct RequestFrame {
   struct etherhdr hdr;
 };
 
-struct DataFrame {
-  struct etherhdr hdr;
-  unsigned char default_entry;
-};
-
+// NOTE: This module is AGPL3, however grub currently only checks for GPL3
+// TODO: File a bug report with grub and/or verify that an AGPL3 license is
+// compatible
 GRUB_MOD_LICENSE("GPLv3+");
 
 static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd
@@ -76,50 +74,28 @@ static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd
 
   struct grub_net_buff *response;
   struct etherhdr hdr = {0};
-  const grub_uint64_t timeout_ms = 2000;
+  const grub_uint64_t timeout_ms = 1000;
   grub_uint64_t limit_time = grub_get_time_ms() + timeout_ms;
   do {
     response = card->driver->recv(card);
     hdr = *(struct etherhdr *)response->data;
     if (limit_time < grub_get_time_ms()) {
       grub_printf("timeout waiting for response\n");
-      break;
-    }
-  } while (hdr.type != ethertype);
-  if (hdr.type == ethertype) {
-    grub_netbuff_pull(response, sizeof(struct etherhdr));
-    grub_printf("received default int:%hhx\n",
-                *(grub_uint8_t *)&response->data);
-    //    grub_env_set("default", *(grub_uint8_t *)&response->data);
-    grub_env_set("default", "1");
-    grub_int32_t buf_size =
-        grub_snprintf(NULL, 0, "%hhx", *(grub_uint8_t *)&response->data);
-    if (buf_size > 0) {
-      // + 1 because snprintf doesn't count the null character
-      char *default_str = grub_malloc(buf_size + 1);
-      grub_snprintf(default_str, buf_size + 1, "%hhx",
-                    *(grub_uint8_t *)&response->data);
-      grub_printf("received default str:%s\n", default_str);
-      grub_env_set("default", default_str);
-      grub_free(default_str);
-    } else {
-      if (buf_size < 0) {
-        grub_printf("snprintf error: %d", buf_size);
-      }
       return 1;
     }
-    return 0;
-  } else {
-    return 1;
-  }
+  } while (hdr.type != ethertype);
+  grub_netbuff_pull(response, sizeof(struct etherhdr));
+  grub_printf("got default:%s\n", (char *)response->data);
+  grub_env_set("default", (char *)response->data);
+  return 0;
 }
 
 static grub_extcmd_t cmd;
 
-GRUB_MOD_INIT(remote_bootselect) {
+GRUB_MOD_INIT(remote - bootselect) {
   cmd = grub_register_extcmd(
-      "remote_bootselect", grub_cmd_remote_bootselect, 0, 0,
+      "remote-bootselect", grub_cmd_remote_bootselect, 0, 0,
       N_("Get the default boot option from the network."), 0);
 }
 
-GRUB_MOD_FINI(remote_bootselect) { grub_unregister_extcmd(cmd); }
+GRUB_MOD_FINI(remote - bootselect) { grub_unregister_extcmd(cmd); }
