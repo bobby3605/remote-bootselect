@@ -2,33 +2,29 @@
 #define REMOTE_DEFAULT_UTIL_H_
 #include <net/ethernet.h>
 
-struct RemoteDefaultRequest {
-  char grub[5];
-} RemoteDefaultRequest_grub = {"grub"};
+#define BOOTSELECT_ETHERTYPE 0x7184
+
+struct uint48 {
+  uint64_t x : 48;
+} __attribute__((packed));
 
 struct RequestFrame {
   struct ethhdr hdr;
-  struct RemoteDefaultRequest request;
-};
-
-struct DataPacket {
-  struct RemoteDefaultRequest request;
-  unsigned char default_entry;
 };
 
 struct DataFrame {
   struct ethhdr hdr;
-  struct DataPacket packet;
-};
-
-struct RemoteDefaultData {
-  unsigned char mac[6];
   unsigned char default_entry;
 };
 
-struct RemoteDefaultNode {
-  struct RemoteDefaultData data;
-  struct RemoteDefaultNode *next;
+struct RemoteDefaultData {
+  struct uint48 mac;
+  unsigned char default_entry;
+};
+
+struct RemoteDefaultEntries {
+  struct RemoteDefaultData *data;
+  unsigned int size;
 };
 
 #endif // REMOTE_DEFAULT_UTIL_H_
