@@ -157,38 +157,41 @@ void request_default(int sock, char *if_name) {
 }
 
 void listen_default(int sock, char *if_name) {
-  struct RequestFrame frame;
-  while (memcmp(frame.hdr.h_dest, ether_broadcast_addr,
-                sizeof(ether_broadcast_addr)) != 0) {
-    recvfrom(sock, &frame, sizeof(frame), 0, NULL, NULL);
-  }
-  printf("received request from: ");
-  print_mac(frame.hdr.h_source);
-  printf("\n");
-  bool sent = false;
-  for (int i = 0; i < remote_default_entries.size; ++i) {
-    struct RemoteDefaultData *data = &remote_default_entries.data[i];
-    // find the correct mac address data in the vector
-    if (data->mac.x == ((struct uint48 *)frame.hdr.h_source)->x) {
+  while (true) {
+    struct RequestFrame frame = {0};
+    while (memcmp(frame.hdr.h_dest, ether_broadcast_addr,
+                  sizeof(ether_broadcast_addr)) != 0) {
+      recvfrom(sock, &frame, sizeof(frame), 0, NULL, NULL);
+    }
+    printf("received request from: ");
+    print_mac(frame.hdr.h_source);
+    printf("\n");
+    struct RemoteDefaultData *data = NULL;
+    for (int i = 0; i < remote_default_entries.size; ++i) {
+      data = &remote_default_entries.data[i];
+      if (data->mac.x == ((struct uint48 *)frame.hdr.h_source)->x) {
+        break;
+      } else {
+        data = NULL;
+      }
+    }
+    if (data) {
+      // find the correct mac address data in the vector
       // sent the default entry packet for the mac address
       send_packet(sock, if_name, &data->mac, &data->default_entry,
                   sizeof(data->default_entry));
       printf("sent default:%s\n", data->default_entry);
-      sent = true;
-      break;
+    } else {
+      printf("failed to find entry for mac address: ");
+      print_mac(frame.hdr.h_source);
+      printf("\n");
+      printf("entries:\n");
+      for (int i = 0; i < remote_default_entries.size; ++i) {
+        struct RemoteDefaultData *data = &remote_default_entries.data[i];
+        print_mac(&data->mac);
+        printf(" %s\n", data->default_entry);
+      }
     }
-  }
-  if (!sent) {
-    printf("failed to find entry for mac address: ");
-    print_mac(frame.hdr.h_source);
-    printf("\n");
-    printf("entries:\n");
-    for (int i = 0; i < remote_default_entries.size; ++i) {
-      struct RemoteDefaultData *data = &remote_default_entries.data[i];
-      print_mac(&data->mac);
-      printf(" %s\n", data->default_entry);
-    }
-    exit(1);
   }
 }
 

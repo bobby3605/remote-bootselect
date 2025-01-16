@@ -93,8 +93,7 @@ The client will wait for packets with the destination as its mac address and the
 Once the client receives and verifies the packet, it will set the default entry and exit
 
 ## TODO:
-Currently the server closes after sending one packet.\
-It should remain open, but also be able to be closed with signals.
+Safely close the server by handling signals
 
 The server should be able to be dynamically configured, both through a unix socket or by listening an MQTT topic.
 
