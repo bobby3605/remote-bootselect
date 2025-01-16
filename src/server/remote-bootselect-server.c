@@ -195,7 +195,7 @@ void listen_default(int sock, char *if_name) {
   }
 }
 
-void load_defaults(char *filename) {
+void load_config(char *filename) {
   // FF:FF:FF:FF:FF:FF 1\n is 20 characters
   const unsigned int line_size = 20;
   struct stat file_status;
@@ -226,18 +226,27 @@ void load_defaults(char *filename) {
 
 int main(int argc, char *argv[]) {
   int sock = setup_socket();
-  char *if_name = argv[1];
-  if (strcmp(argv[2], "request") == 0) {
-    printf("sending request \n");
-    request_default(sock, if_name);
-  } else if (strcmp(argv[2], "listen") == 0) {
-    printf("listening for request \n");
-    load_defaults("config");
-    listen_default(sock, if_name);
-  } else {
-    printf("valid usage: ./remote_default_util interface_name request\n");
-    printf("valid usage: ./remote_default_util interface_name listen [[mac] "
-           "[default_entry]]...");
+  int curr_arg = 0;
+  char *if_name;
+  while (curr_arg < argc) {
+    ++curr_arg;
+    if (strcmp(argv[curr_arg], "-i") == 0) {
+      if_name = argv[++curr_arg];
+    } else if (strcmp(argv[curr_arg], "-c") == 0) {
+      load_config(argv[++curr_arg]);
+    } else if (strcmp(argv[curr_arg], "-r") == 0) {
+      printf("sending request \n");
+      request_default(sock, if_name);
+      break;
+    } else if (strcmp(argv[curr_arg], "-l") == 0) {
+      printf("listening for request \n");
+      listen_default(sock, if_name);
+      break;
+    } else {
+      printf("valid usage: ./remote_default_util -i interface_name [-c "
+             "config_file] -l/r (listen or request)\n");
+      break;
+    }
   }
   close(sock);
 }
