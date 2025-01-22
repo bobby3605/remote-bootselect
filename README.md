@@ -6,6 +6,7 @@ This is currently alpha software and is not ready for real use.
 ## remote-bootselect-server
 This program listens for broadcast packets with a custom ethertype.\
 It must run as root because it operates on L2, so it reads and sends raw packets.\
+It will drop its permissions to the remote-bootselect user after opening the raw socket.\
 Usage:
 ``` 
 ./remote-bootselect-server interface_name listen
@@ -15,7 +16,7 @@ It also has the capability to request default data. This is useful for debugging
 ./remote-bootselect-server interface_name request
 ```
 ### Configuration:
-Create a file named 'config' in the same directory as remote-bootselect-server.\
+You can pass a config file to remote-bootselect-server with the '-c' flag
 Add entries to the file following this example:
 ```
 0a:1b:2c:3d:4e:5f default_entry
@@ -24,6 +25,8 @@ The first parameter is the mac address of the target server.\
 The second parameter is what will be passed to the 'default' environment variable in grub.\
 The second parameter can be up to 63 characters long.\
 Create one line per config entry
+This same file format can also be sent to the /tmp/remote-bootselect-server/config pipe.
+This allows for dynamically changing the default entry of a server.
 
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
@@ -49,7 +52,9 @@ gcc pkg-config m4 libtool automake autoconf bison flex
 ### remote-bootselect-server
 ```
 make build/remote-bootselect-server
+make user
 ```
+'make user' ensures that the remote-bootselect system user exists.
 ### remote-bootselect.mod
 Ensure you have the grub source:
 ```
@@ -95,15 +100,13 @@ Once the client receives and verifies the packet, it will set the default entry 
 ## TODO:
 Safely close the server by handling signals
 
-The server should be able to be dynamically configured, both through a unix socket or by listening an MQTT topic.
+Document integrating the /tmp/remote-bootselect-server/config pipe with mqtt
 
 Faster checking of entries. Currently, the entries are stored in a vector, which is O(n) to search.\
 However, it should still take an insignificant time to search with any reasonable number of entries.\
 Faster insertion of new entries as well once there is dynamic configuration.
 
 The build process could be made simpler by only compiling the module instead of all of grub.
-
-setuid() to a standard (installation created) user after opening the socket, to reduce the possible damage of a security vulnerability
 
 Dockerfile for running the server\
 Dockerfile for building the both the server and module

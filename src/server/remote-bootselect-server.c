@@ -1,6 +1,8 @@
 #include "remote-bootselect-server.h"
+#include "util.h"
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <linux/filter.h>
 #include <malloc.h>
 #include <net/ethernet.h>
@@ -11,12 +13,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-struct RemoteDefaultEntries remote_default_entries;
 
 unsigned char ether_broadcast_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
@@ -34,47 +35,25 @@ struct sock_fprog filter = {
     .filter = filter_code,
 };
 
-void print_mac(void *mac) {
-  unsigned char *mac_uc = (unsigned char *)mac;
-  for (int i = 0; i < 6; ++i) {
-    // don't print an extra : at the end
-    if (i != 5) {
-      printf("%02X:", mac_uc[i]);
-    } else {
-      printf("%02X", mac_uc[i]);
-    }
-  }
+int setup_config_fifo() {
+  const char folder_path[] = "/tmp/remote-bootselect-server";
+  const char config_path[] = "/tmp/remote-bootselect-server/config";
+  umask(0000);
+  mkdir(folder_path, 0777);
+  mkfifo(config_path, 0777);
+  return open(config_path, O_RDONLY);
 }
 
-// https://natanyellin.com/posts/ebpf-filtering-done-right/
-// https://github.com/the-tcpdump-group/libpcap/blob/f4fcc9396dc425399846cf082f9ed1056b81dd11/pcap-linux.c#L6096
-void drain_socket(int sock) {
-  struct sock_filter zero_bytecode = BPF_STMT(BPF_RET | BPF_K, 0);
-  struct sock_fprog zero_program = {1, &zero_bytecode};
-  if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &zero_program,
-                 sizeof(zero_program)) != 0) {
-    printf("error attaching zero bpf: %s\n", strerror(errno));
-    exit(1);
-  }
-  char drain[1];
-  while (true) {
-    int bytes = recv(sock, drain, sizeof(drain), MSG_DONTWAIT);
-    if (bytes == -1) {
-      break;
-    }
-  }
-}
-
-int setup_socket() {
+int setup_listen_socket() {
   int sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
   if (sock == -1) {
-    printf("%s", strerror(errno));
+    printf("failed to setup listen socket: %s\n", strerror(errno));
     exit(errno);
   }
   drain_socket(sock);
   if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &filter, sizeof(filter)) !=
       0) {
-    printf("%s", strerror(errno));
+    printf("failed to attach listen socket filter: %s\n", strerror(errno));
     exit(errno);
   }
   return sock;
@@ -87,18 +66,18 @@ void get_if_info(int sock, char *if_name, int *index, struct sockaddr *hwaddr) {
     memcpy(ifr.ifr_name, if_name, if_name_len);
     ifr.ifr_name[if_name_len] = 0;
   } else {
-    printf("%s", strerror(errno));
+    printf("bad length when getting interface info: %s\n", strerror(errno));
     exit(errno);
   }
 
   if (ioctl(sock, SIOCGIFINDEX, &ifr) == -1) {
-    printf("%s", strerror(errno));
+    printf("failed to get interface index: %s\n", strerror(errno));
     exit(errno);
   }
   *index = ifr.ifr_ifindex;
 
   if (ioctl(sock, SIOCGIFHWADDR, &ifr) == -1) {
-    printf("%s", strerror(errno));
+    printf("failed to get interface mac address: %s\n", strerror(errno));
     exit(errno);
   }
   memcpy(hwaddr->sa_data, ifr.ifr_hwaddr.sa_data,
@@ -133,9 +112,8 @@ void send_packet(int sock, char *if_name, void *dst_addr, void *packet,
 
   if (sendto(sock, frame, frame_size, 0, (struct sockaddr *)&addr,
              sizeof(addr)) == -1) {
-    printf("%s", strerror(errno));
+    printf("failed to send packet: %s\n", strerror(errno));
     free(frame);
-    exit(errno);
   }
   free(frame);
 }
@@ -156,76 +134,143 @@ void request_default(int sock, char *if_name) {
   printf("\n");
 }
 
-void listen_default(int sock, char *if_name) {
-  while (true) {
-    struct RequestFrame frame = {0};
-    while (memcmp(frame.hdr.h_dest, ether_broadcast_addr,
-                  sizeof(ether_broadcast_addr)) != 0) {
-      recvfrom(sock, &frame, sizeof(frame), 0, NULL, NULL);
+void setup_epoll(int epfd, int listen_socket, int config_fifo) {
+  struct epoll_event event;
+  event.events = EPOLLIN;
+  event.data = (epoll_data_t)LISTEN_SOCKET;
+  epoll_ctl(epfd, EPOLL_CTL_ADD, listen_socket, &event);
+  event.data = (epoll_data_t)CONFIG_FIFO;
+  epoll_ctl(epfd, EPOLL_CTL_ADD, config_fifo, &event);
+}
+
+struct RemoteDefaultData *find_default_data(struct uint48 source_mac) {
+  for (int i = 0; i < remote_default_entries.size; ++i) {
+    struct RemoteDefaultData *data = &remote_default_entries.data[i];
+    if (data->mac.x == source_mac.x) {
+      return data;
     }
-    printf("received request from: ");
+  }
+  return NULL;
+}
+
+void process_listen_socket(int listen_socket, char *if_name) {
+  struct RequestFrame frame = {0};
+  recv(listen_socket, &frame, sizeof(frame), 0);
+  // check that it is a broadcast packet
+  if (memcmp(frame.hdr.h_dest, ether_broadcast_addr,
+             sizeof(ether_broadcast_addr)) != 0) {
+    return;
+  }
+
+  printf("received request from: ");
+  print_mac(frame.hdr.h_source);
+  printf("\n");
+
+  struct RemoteDefaultData *data =
+      find_default_data(*(struct uint48 *)frame.hdr.h_source);
+  if (data) {
+    send_packet(listen_socket, if_name, &data->mac, &data->default_entry,
+                sizeof(data->default_entry));
+    printf("sent default:%s\n", data->default_entry);
+  } else {
+    printf("failed to find entry for mac address: ");
     print_mac(frame.hdr.h_source);
     printf("\n");
-    struct RemoteDefaultData *data = NULL;
-    for (int i = 0; i < remote_default_entries.size; ++i) {
-      data = &remote_default_entries.data[i];
-      if (data->mac.x == ((struct uint48 *)frame.hdr.h_source)->x) {
-        break;
-      } else {
-        data = NULL;
-      }
-    }
-    if (data) {
-      // find the correct mac address data in the vector
-      // sent the default entry packet for the mac address
-      send_packet(sock, if_name, &data->mac, &data->default_entry,
-                  sizeof(data->default_entry));
-      printf("sent default:%s\n", data->default_entry);
-    } else {
-      printf("failed to find entry for mac address: ");
-      print_mac(frame.hdr.h_source);
-      printf("\n");
-      printf("entries:\n");
-      for (int i = 0; i < remote_default_entries.size; ++i) {
-        struct RemoteDefaultData *data = &remote_default_entries.data[i];
-        print_mac(&data->mac);
-        printf(" %s\n", data->default_entry);
-      }
-    }
+    print_entries();
   }
 }
 
-void load_config(char *filename) {
-  // FF:FF:FF:FF:FF:FF 1\n is 20 characters
-  const unsigned int line_size = 20;
-  struct stat file_status;
-  if (stat(filename, &file_status) < 0) {
-    printf("%s", strerror(errno));
+void set_default_data(struct RemoteDefaultData *default_data) {
+  for (unsigned int i = 0; i < remote_default_entries.size; ++i) {
+    if (remote_default_entries.data[i].mac.x == default_data->mac.x) {
+      memset(remote_default_entries.data[i].default_entry, 0,
+             sizeof(remote_default_entries.data[i].default_entry));
+      strcpy(remote_default_entries.data[i].default_entry,
+             default_data->default_entry);
+      return;
+    }
+  }
+  // If the loop didn't return, then the default data doesn't exist in the
+  // buffer. Increase the size of the buffer and add the data.
+  struct RemoteDefaultData *new_data =
+      malloc(sizeof(struct RemoteDefaultData) * ++remote_default_entries.size);
+  memcpy(new_data, remote_default_entries.data,
+         sizeof(struct RemoteDefaultData) * (remote_default_entries.size - 1));
+  free(remote_default_entries.data);
+  remote_default_entries.data = new_data;
+  memcpy(&remote_default_entries.data[remote_default_entries.size - 1],
+         default_data, sizeof(struct RemoteDefaultData));
+}
+
+void process_config_fd(int config_fd) {
+  size_t bufsize = 0;
+  if (ioctl(config_fd, FIONREAD, &bufsize) < 0) {
+    printf("failed to get buffer size for config socket: %s\n",
+           strerror(errno));
+    return;
+  }
+  char *config_buffer = malloc(bufsize);
+  if (config_buffer == NULL) {
+    printf("null config read buffer\n");
+    exit(1);
+  }
+  int config_size = read(config_fd, config_buffer, bufsize);
+  if (config_size == -1) {
+    printf("config recv failed: %s\n", strerror(errno));
     exit(errno);
   }
-
-  FILE *f;
-  f = fopen(filename, "r");
-  char file_buffer[file_status.st_size];
-  fgets(file_buffer, file_status.st_size, f);
-
-  remote_default_entries.size = file_status.st_size / line_size;
-  remote_default_entries.data =
-      malloc(sizeof(struct RemoteDefaultData) * remote_default_entries.size);
-  memset(remote_default_entries.data, 0,
-         sizeof(struct RemoteDefaultData) * remote_default_entries.size);
-
-  for (int i = 0; i < remote_default_entries.size; ++i) {
-    unsigned char *mac = (unsigned char *)&remote_default_entries.data[i].mac;
-    sscanf(&file_buffer[i * line_size],
-           "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %s\n", &mac[0], &mac[1],
-           &mac[2], &mac[3], &mac[4], &mac[5],
-           remote_default_entries.data[i].default_entry);
+  for (int i = 0; i < config_size;) {
+    struct RemoteDefaultData default_data = {0};
+    unsigned char *mac = (unsigned char *)&default_data.mac;
+    sscanf(&config_buffer[i], "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %s\n",
+           &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5],
+           default_data.default_entry);
+    set_default_data(&default_data);
+    i += 18; // MAC with : is 18 characters
+    i += strlen(default_data.default_entry);
+    i += 1; // 1 more for the \n
   }
+  free(config_buffer);
+}
+
+void listen_default(int listen_socket, char *if_name) {
+  int config_fifo = setup_config_fifo();
+  int epfd = epoll_create1(0);
+  setup_epoll(epfd, listen_socket, config_fifo);
+  struct epoll_event events[2];
+  while (true) {
+    int event_count = epoll_wait(epfd, events, sizeof(events), -1);
+    if (event_count > 0) {
+      for (int i = 0; i < event_count; ++i) {
+        // ignore EPOLLHUP
+        // this is needed because read() on a pipe with no other end causes
+        // EPOLLHUP without this check, there is an infinite loop here
+        if (events[i].events != EPOLLHUP) {
+          switch (events[i].data.u32) {
+          case LISTEN_SOCKET:
+            printf("LISTEN_SOCKET\n");
+            process_listen_socket(listen_socket, if_name);
+            break;
+          case CONFIG_FIFO:
+            printf("CONFIG_SOCKET\n");
+            process_config_fd(config_fifo);
+            break;
+          }
+        }
+      }
+    } else {
+      printf("epoll_wait count <= 0: %s\n", strerror(errno));
+      break;
+    }
+  }
+  close(config_fifo);
+  close(epfd);
 }
 
 int main(int argc, char *argv[]) {
-  int sock = setup_socket();
+  int sock = setup_listen_socket();
+  // drop root permissions
+  drop_permissions();
   int curr_arg = 0;
   char *if_name;
   while (curr_arg < argc) {
@@ -233,7 +278,10 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[curr_arg], "-i") == 0) {
       if_name = argv[++curr_arg];
     } else if (strcmp(argv[curr_arg], "-c") == 0) {
-      load_config(argv[++curr_arg]);
+      // load config file
+      int f = open(argv[++curr_arg], O_RDONLY);
+      process_config_fd(f);
+      close(f);
     } else if (strcmp(argv[curr_arg], "-r") == 0) {
       printf("sending request \n");
       request_default(sock, if_name);
