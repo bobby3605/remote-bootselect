@@ -27,12 +27,12 @@ Create one line per config entry
 This same file format can also be sent to the /tmp/remote-bootselect-server/config pipe.
 This allows for dynamically changing the default entry of a server.
 ## MQTT:
-The config pipe allows for easy integration with MQTT:
+The config pipe allows for easy integration with MQTT:\
 Subscribe to a topic and output to the pipe:
 ```
 mosquitto_sub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect > /tmp/remote-bootselect-server/config
 ```
-Publish default entry data to the topic
+Publish default entry data to the topic:
 ```
 mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect -m "aa:bb:cc:dd:ee:ff 1"
 ```
