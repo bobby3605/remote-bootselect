@@ -1,7 +1,6 @@
 # remote-bootselect
 This program enables remotely setting the default boot option in grub.\
 There is a server program and a grub module.\
-This is currently alpha software and is not ready for real use.
 
 ## remote-bootselect-server
 This program listens for broadcast packets with a custom ethertype.\
@@ -27,6 +26,16 @@ The second parameter can be up to 63 characters long.\
 Create one line per config entry
 This same file format can also be sent to the /tmp/remote-bootselect-server/config pipe.
 This allows for dynamically changing the default entry of a server.
+## MQTT:
+The config pipe allows for easy integration with MQTT:
+Subscribe to a topic and output to the pipe:
+```
+mosquitto_sub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect > /tmp/remote-bootselect-server/config
+```
+Publish default entry data to the topic
+```
+mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect -m "aa:bb:cc:dd:ee:ff 1"
+```
 
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
@@ -100,8 +109,6 @@ Once the client receives and verifies the packet, it will set the default entry 
 ## TODO:
 Safely close the server by handling signals
 
-Document integrating the /tmp/remote-bootselect-server/config pipe with mqtt
-
 Faster checking of entries. Currently, the entries are stored in a vector, which is O(n) to search.\
 However, it should still take an insignificant time to search with any reasonable number of entries.\
 Faster insertion of new entries as well once there is dynamic configuration.
@@ -111,12 +118,10 @@ The build process could be made simpler by only compiling the module instead of 
 Dockerfile for running the server\
 Dockerfile for building the both the server and module
 
-Debug log for server instead of stdout
-
 Allow the network card/interface to be specified in the module
 
 More robust checking of possible security vulnerabilities in the server or module code
 
 General code cleanup 
 
-Shared headers for ethertype and ethernet frames
+Shared headers for ethertype and ethernet frames between server and module
