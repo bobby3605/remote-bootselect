@@ -4,12 +4,13 @@ There is a server program and a grub module.
 
 # Quickstart
 ## Server
+Pull the server container and run it:
 ```
 docker pull bobby3605/remote-bootselect
 ```
-Copy docker-compose.yml
-Edit the environment variables for the interface and MQTT info
-Run the container as root
+Copy docker-compose.yml.\
+Edit the environment variables for the interface and MQTT info.\
+Run the container as root:
 ```
 sudo docker compose up -d
 ```
