@@ -6,7 +6,7 @@ There is a server program and a grub module.
 ## Server
 Pull the server container and run it:
 ```
-docker pull bobby3605/remote-bootselect
+sudo docker pull bobby3605/remote-bootselect
 ```
 Copy docker-compose.yml.\
 Edit the environment variables for the interface and MQTT info.\
