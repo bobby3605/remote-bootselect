@@ -32,9 +32,9 @@ Subscribe to a topic and output to the pipe:
 ```
 mosquitto_sub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect > /tmp/remote-bootselect-server/config
 ```
-Publish default entry data to the topic:
+Publish default entry data to the topic in retained mode:
 ```
-mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect -m "aa:bb:cc:dd:ee:ff 1"
+mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect -r -m "aa:bb:cc:dd:ee:ff 1"
 ```
 # Home Assistant:
 An auto discovery payload can be sent to the home assistant discovery topic in MQTT to add buttons for remote-bootselect in home assistant.\
@@ -55,14 +55,16 @@ Example MQTT auto discovery:
       "unique_id":"boot_0",
       "name":"Linux boot option",
       "command_topic": "remote-bootselect",
-      "payload_press": "aa:bb:cc:dd:ee:ff 0"
+      "payload_press": "aa:bb:cc:dd:ee:ff 0",
+      "retain": true
     },
     "boot_1": {
       "p": "button",
       "unique_id":"boot_1",
       "name":"Windows boot option",
       "command_topic": "remote-bootselect",
-      "payload_press": "aa:bb:cc:dd:ee:ff 1"
+      "payload_press": "aa:bb:cc:dd:ee:ff 1",
+      "retain": true
     }
   },
   "qos": 0
@@ -70,8 +72,12 @@ Example MQTT auto discovery:
 ```
 Publish to home assistant discovery topic with retained mode:
 ```
-mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t homeassistant/device/remote-bootselect/config -r -m '{"dev":{"ids":"remote-bootselect","name":"Remote Bootselect"},"o":{"name":"remote-bootselect","url":"https://github.com/bobby3605/remote-bootselect/"},"cmps":{"boot_0":{"p":"button","unique_id":"boot_0","name":"Linux boot option","command_topic":"remote-bootselect","payload_press":"aa:bb:cc:dd:ee:ff 0"},"boot_1":{"p":"button","unique_id":"boot_1","name":"Windows boot option","command_topic":"remote-bootselect","payload_press":"aa:bb:cc:dd:ee:ff 1"}},"qos":0}'
+mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t homeassistant/device/remote-bootselect/config -r -m '{"dev":{"ids":"remote-bootselect","name":"Remote Bootselect"},"o":{"name":"remote-bootselect","url":"https://github.com/bobby3605/remote-bootselect/"},"cmps":{"boot_0":{"p":"button","unique_id":"boot_0","name":"Linux boot option","command_topic":"remote-bootselect","payload_press":"aa:bb:cc:dd:ee:ff 0","retain":true},"boot_1":{"p":"button","unique_id":"boot_1","name":"Windows boot option","command_topic":"remote-bootselect","payload_press":"aa:bb:cc:dd:ee:ff 1","retain":true}},"qos":0}'
 ```
+Note:\
+Attempting to configure the boot options of multiple devices can be a bit tricky,\
+because the whole configuration of all devices needs to be in the payload.\
+Or, when the servers starts up, you can individually send the payload messages for each server.
 
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
@@ -145,14 +151,27 @@ Once the client receives and verifies the packet, it will set the default entry 
 ## TODO:
 Safely close the server by handling signals
 
+When the program that writes to the config pipe closes,\
+epoll_wait immediately returns EPOLLHUP on every call,\
+resulting in high cpu usage.\
+It can still read from the pipe if a process writes to it,\
+but now epoll_wait() returns EPOLLHUP immediately if there's no data.
+
+Better handling of multiple devices in MQTT and home assistant
+
 Faster checking of entries. Currently, the entries are stored in a vector, which is O(n) to search.\
 However, it should still take an insignificant time to search with any reasonable number of entries.\
 Faster insertion of new entries as well once there is dynamic configuration.
 
 The build process could be made simpler by only compiling the module instead of all of grub.
 
-Dockerfile for running the server\
-Dockerfile for building the both the server and module
+Dockerfile for building the both the server and module.\
+Send signal when server is done initializing.\
+This could allow the container to wait on the signal instead of 'sleep 1'
+
+Properly handle kill signals in docker entrypoint.\
+Currently, the container stops itself after 10 seconds.\
+It should be quick to stop.
 
 Allow the network card/interface to be specified in the module
 
@@ -161,3 +180,4 @@ More robust checking of possible security vulnerabilities in the server or modul
 General code cleanup 
 
 Shared headers for ethertype and ethernet frames between server and module
+

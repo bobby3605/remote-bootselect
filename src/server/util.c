@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -26,7 +27,7 @@ void print_mac(void *mac) {
 void drop_permissions() {
   struct passwd *user = getpwnam("remote-bootselect");
   if (user == NULL) {
-    printf("failed to get remote-bootselect user: %s", strerror(errno));
+    printf("failed to get remote-bootselect user: %s\n", strerror(errno));
     exit(errno);
   }
   setuid(user->pw_uid);

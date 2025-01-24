@@ -43,7 +43,7 @@ int setup_config_fifo() {
   umask(0000);
   mkdir(folder_path, 0777);
   mkfifo(config_path, 0777);
-  return open(config_path, O_RDONLY);
+  return open(config_path, O_RDONLY | O_NONBLOCK);
 }
 
 int setup_listen_socket() {
