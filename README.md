@@ -1,6 +1,6 @@
 # remote-bootselect
 This program enables remotely setting the default boot option in grub.\
-There is a server program and a grub module.\
+There is a server program and a grub module.
 
 ## remote-bootselect-server
 This program listens for broadcast packets with a custom ethertype.\
