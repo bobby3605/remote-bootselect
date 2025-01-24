@@ -1,6 +1,6 @@
 services:
   remote-bootselect:
-    image: remote-bootselect:latest
+    image: bobby3605/remote-bootselect:latest
     network_mode: "host"
     environment:
       INTERFACE: ""

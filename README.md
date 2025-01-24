@@ -2,6 +2,26 @@
 This program enables remotely setting the default boot option in grub.\
 There is a server program and a grub module.
 
+## Quickstart
+# Server
+```
+docker pull bobby3605/remote-bootselect
+```
+Copy docker-compose.yml
+Edit the environment variables for the interface and MQTT info
+Run the container as root
+```
+sudo docker compose up -d
+```
+# Home Assistant
+Edit the home assistant auto discovery payload shown in the Home Assistant configuration section.\
+Minify it at https://jsonformatter.org/ \
+Submit it to the home assistant discovery topic, as shown in the Home Assistant configuration section.
+# GRUB module
+Download the latest grub module from the releases.\
+Currently, it is only built for x86_64-efi.\
+Follow the remote-bootselect.mod configuration section.
+
 ## remote-bootselect-server
 This program listens for broadcast packets with a custom ethertype.\
 It must run as root because it operates on L2, so it reads and sends raw packets.\
