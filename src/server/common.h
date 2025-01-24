@@ -18,6 +18,6 @@ struct RemoteDefaultEntries {
   unsigned int size;
 };
 
-static struct RemoteDefaultEntries remote_default_entries = {0};
+extern struct RemoteDefaultEntries remote_default_entries;
 
 #endif // COMMON_H_

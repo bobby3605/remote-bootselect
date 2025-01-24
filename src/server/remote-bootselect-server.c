@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+struct RemoteDefaultEntries remote_default_entries = {0};
+
 unsigned char ether_broadcast_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 const uint32_t max_size = sizeof(struct DataFrame);
