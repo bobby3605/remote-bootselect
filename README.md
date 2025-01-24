@@ -49,7 +49,7 @@ The second parameter can be up to 63 characters long.\
 Create one line per config entry
 This same file format can also be sent to the /tmp/remote-bootselect-server/config pipe.
 This allows for dynamically changing the default entry of a server.
-## MQTT:
+#### MQTT:
 The config pipe allows for easy integration with MQTT:\
 Subscribe to a topic and output to the pipe:
 ```
@@ -59,7 +59,7 @@ Publish default entry data to the topic in retained mode:
 ```
 mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect -r -m "aa:bb:cc:dd:ee:ff 1"
 ```
-# Home Assistant:
+#### Home Assistant:
 An auto discovery payload can be sent to the home assistant discovery topic in MQTT to add buttons for remote-bootselect in home assistant.\
 Example MQTT auto discovery:
 ```
