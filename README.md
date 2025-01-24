@@ -3,7 +3,7 @@ This program enables remotely setting the default boot option in grub.\
 There is a server program and a grub module.
 
 # Quickstart
-The docker container has the server and MQTT integration built in
+The docker container has the server daemon and MQTT integration built in.\
 ## Server
 Pull the server container:
 ```
@@ -107,7 +107,7 @@ Or, when the servers starts up, you can individually send the payload messages f
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
 ### Installation:
-As root, install the module into your grub boot folder and update grub:\
+As root, install the module into your grub boot folder and update grub:
 ``` 
 sudo su
 cp remote-bootselect.mod /boot/grub/x86_64-efi/remote-bootselect.mod
