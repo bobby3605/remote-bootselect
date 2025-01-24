@@ -1,0 +1,6 @@
+FROM debian:latest
+RUN apt update && apt install -y build-essential linux-headers-generic autoconf automake gettext git patch autopoint binutils bison flex m4 python3 pkg-config gawk
+WORKDIR /app
+COPY . .
+
+ENTRYPOINT ["make", "oneshot"]

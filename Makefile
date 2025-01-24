@@ -1,4 +1,4 @@
-.PHONY: all build-dir clean install configure-grub bootstrap-grub user
+.PHONY: all build-dir clean install configure-grub bootstrap-grub oneshot
 
 all: build/remote-bootselect-server build/remote-bootselect.mod
 
@@ -23,9 +23,8 @@ build/remote-bootselect.mod: build-dir
 	cd grub; make -j;
 	cp grub/grub-core/remote-bootselect.mod build/remote-bootselect.mod
 
-user:
-	sudo useradd -r remote-bootselect
-
-install: user
+install:
 	sudo cp build/remote-bootselect.mod /boot/grub/x86_64-efi/remote-bootselect.mod
 	sudo cp src/grub/01-remote-bootselect /etc/grub.d/01-remote_bootselect || echo "/etc/grub.d/ not found. If you are on nixos, add the contents of src/grub/01-remote-bootselect to boot.loader.grub.extraConfig"
+
+oneshot: bootstrap-grub configure-grub all

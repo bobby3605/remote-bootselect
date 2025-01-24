@@ -8,6 +8,7 @@
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <netpacket/packet.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -36,6 +37,10 @@ struct sock_fprog filter = {
     .len = sizeof(filter_code) / sizeof(filter_code[0]),
     .filter = filter_code,
 };
+
+int listen_socket;
+int config_fifo;
+int epfd;
 
 int setup_config_fifo() {
   const char folder_path[] = "/tmp/remote-bootselect-server";
@@ -236,26 +241,38 @@ void process_config_fd(int config_fd) {
 }
 
 void listen_default(int listen_socket, char *if_name) {
-  int config_fifo = setup_config_fifo();
-  int epfd = epoll_create1(0);
+  config_fifo = setup_config_fifo();
+  epfd = epoll_create1(0);
   setup_epoll(epfd, listen_socket, config_fifo);
   struct epoll_event events[2];
+  kill(getppid(), SIGUSR1);
   while (true) {
     int event_count = epoll_wait(epfd, events, sizeof(events), -1);
     if (event_count > 0) {
       for (int i = 0; i < event_count; ++i) {
-        // ignore EPOLLHUP
-        // this is needed because read() on a pipe with no other end causes
-        // EPOLLHUP without this check, there is an infinite loop here
-        if (events[i].events != EPOLLHUP) {
-          switch (events[i].data.u32) {
-          case LISTEN_SOCKET:
-            process_listen_socket(listen_socket, if_name);
-            break;
-          case CONFIG_FIFO:
+        switch (events[i].data.u32) {
+        case LISTEN_SOCKET:
+          process_listen_socket(listen_socket, if_name);
+          break;
+        case CONFIG_FIFO:
+          if (events[i].events == EPOLLHUP) {
+            // Reset the config_fifo when the writer closes it.
+            // This is required due to a known limitation of pipes and epoll.
+            // Whenever a writer closes a pipe, EPOLLHUP is set as a persistent
+            // state. It won't be cleared until the pipe closes. So it has to be
+            // recreated, otherwise epoll_wait will return EPOLLHUP immediately
+            // on every call
+            epoll_ctl(epfd, EPOLL_CTL_DEL, config_fifo, NULL);
+            struct epoll_event event;
+            event.events = EPOLLIN;
+            event.data = (epoll_data_t)CONFIG_FIFO;
+            close(config_fifo);
+            config_fifo = setup_config_fifo();
+            epoll_ctl(epfd, EPOLL_CTL_ADD, config_fifo, &event);
+          } else {
             process_config_fd(config_fifo);
-            break;
           }
+          break;
         }
       }
     } else {
@@ -267,10 +284,18 @@ void listen_default(int listen_socket, char *if_name) {
   close(epfd);
 }
 
+void cleanup(int s) {
+  close(config_fifo);
+  close(epfd);
+  close(listen_socket);
+}
+
 int main(int argc, char *argv[]) {
-  int sock = setup_listen_socket();
-  // drop root permissions
-  drop_permissions();
+  struct sigaction action;
+  action.sa_handler = cleanup;
+  sigaction(SIGTERM, &action, NULL);
+  sigaction(SIGINT, &action, NULL);
+  listen_socket = setup_listen_socket();
   int curr_arg = 0;
   char *if_name;
   while (curr_arg < argc) {
@@ -283,10 +308,10 @@ int main(int argc, char *argv[]) {
       process_config_fd(f);
       close(f);
     } else if (strcmp(argv[curr_arg], "-r") == 0) {
-      request_default(sock, if_name);
+      request_default(listen_socket, if_name);
       break;
     } else if (strcmp(argv[curr_arg], "-l") == 0) {
-      listen_default(sock, if_name);
+      listen_default(listen_socket, if_name);
       break;
     } else {
       printf("valid usage: ./remote_default_util -i interface_name [-c "
@@ -294,5 +319,5 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
-  close(sock);
+  close(listen_socket);
 }

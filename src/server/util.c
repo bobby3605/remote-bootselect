@@ -24,15 +24,19 @@ void print_mac(void *mac) {
   }
 }
 
-void drop_permissions() {
-  struct passwd *user = getpwnam("remote-bootselect");
-  if (user == NULL) {
-    printf("failed to get remote-bootselect user: %s\n", strerror(errno));
-    exit(errno);
+/*
+ * Removed due to docker container being sufficient isolation,
+ * and dropping permissions causes issues with mkfifo and
+ * kill(getppid(),SIGUSR1)
+
+  void drop_permissions() { struct passwd *user =
+  getpwnam("remote-bootselect"); if (user == NULL) { printf("failed to get
+  remote-bootselect user: %s\n", strerror(errno)); exit(errno);
+    }
+    setuid(user->pw_uid);
+    setgid(user->pw_gid);
   }
-  setuid(user->pw_uid);
-  setgid(user->pw_gid);
-}
+*/
 
 // https://natanyellin.com/posts/ebpf-filtering-done-right/
 // https://github.com/the-tcpdump-group/libpcap/blob/f4fcc9396dc425399846cf082f9ed1056b81dd11/pcap-linux.c#L6096

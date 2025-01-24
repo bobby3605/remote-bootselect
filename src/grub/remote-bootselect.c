@@ -10,6 +10,8 @@
 #include <grub/time.h>
 #include <grub/types.h>
 
+#define atoi_1(p) (*(p) - '0')
+
 #define BOOTSELECT_ETHERTYPE 0x7184
 
 struct etherhdr {
@@ -30,18 +32,30 @@ GRUB_MOD_LICENSE("GPLv3+");
 static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd
                                              __attribute__((unused)),
                                              int argc __attribute__((unused)),
-                                             char **args
-                                             __attribute__((unused))) {
-
+                                             char **args) {
   if (grub_net_cards == NULL) {
     grub_printf(
         "Failed to find any network cards. Did you call insmod efinet ?\n");
     return 1;
   }
 
-  grub_err_t err;
-  struct grub_net_card *card = &grub_net_cards[0];
+  struct grub_net_card *card;
+  int i = 0;
+  int found_card = 0;
+  FOR_NET_CARDS(card) {
+    if (i == atoi_1(args[0])) {
+      found_card = 1;
+      break;
+    } else {
+      ++i;
+    }
+  }
+  if (found_card == 0) {
+    grub_printf("Failed to find network card: %d\n", atoi_1(args[0]));
+    return 1;
+  }
 
+  grub_err_t err;
   if (!card->opened) {
     err = GRUB_ERR_NONE;
     if (card->driver->open)
