@@ -36,6 +36,42 @@ Publish default entry data to the topic
 ```
 mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t remote-bootselect -m "aa:bb:cc:dd:ee:ff 1"
 ```
+# Home Assistant:
+An auto discovery payload can be sent to the home assistant discovery topic in MQTT to add buttons for remote-bootselect in home assistant.\
+Example MQTT auto discovery:
+```
+{
+  "dev": {
+    "ids": "remote-bootselect",
+    "name": "Remote Bootselect"
+  },
+  "o": {
+    "name":"remote-bootselect",
+    "url": "https://github.com/bobby3605/remote-bootselect/"
+  },
+  "cmps": {
+    "boot_0": {
+      "p": "button",
+      "unique_id":"boot_0",
+      "name":"Linux boot option",
+      "command_topic": "remote-bootselect",
+      "payload_press": "aa:bb:cc:dd:ee:ff 0"
+    },
+    "boot_1": {
+      "p": "button",
+      "unique_id":"boot_1",
+      "name":"Windows boot option",
+      "command_topic": "remote-bootselect",
+      "payload_press": "aa:bb:cc:dd:ee:ff 1"
+    }
+  },
+  "qos": 0
+}
+```
+Publish to home assistant discovery topic with retained mode:
+```
+mosquitto_pub -h MQTT_HOSTNAME -u MQTT_USER -P MQTT_PASSWORD -t homeassistant/device/remote-bootselect/config -r -m '{"dev":{"ids":"remote-bootselect","name":"Remote Bootselect"},"o":{"name":"remote-bootselect","url":"https://github.com/bobby3605/remote-bootselect/"},"cmps":{"boot_0":{"p":"button","unique_id":"boot_0","name":"Linux boot option","command_topic":"remote-bootselect","payload_press":"aa:bb:cc:dd:ee:ff 0"},"boot_1":{"p":"button","unique_id":"boot_1","name":"Windows boot option","command_topic":"remote-bootselect","payload_press":"aa:bb:cc:dd:ee:ff 1"}},"qos":0}'
+```
 
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
