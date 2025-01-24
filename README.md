@@ -105,9 +105,9 @@ Or, when the servers starts up, you can individually send the payload messages f
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
 ### Installation:
+Copy src/grub/01-remote-bootselect to /etc/grub.d/01-remote-bootselect
 ``` 
 cp remote-bootselect.mod /boot/grub/x86_64-efi/remote-bootselect.mod
-cp src/grub/01-remote-bootselect file to /etc/grub.d/01-remote-bootselect
 chmod +x /etc/grub.d/01-remote-bootselect
 update-grub
 ```
