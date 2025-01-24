@@ -164,16 +164,16 @@ void process_listen_socket(int listen_socket, char *if_name) {
     return;
   }
 
-  printf("received request from: ");
-  print_mac(frame.hdr.h_source);
-  printf("\n");
+  //  printf("received request from: ");
+  //  print_mac(frame.hdr.h_source);
+  //  printf("\n");
 
   struct RemoteDefaultData *data =
       find_default_data(*(struct uint48 *)frame.hdr.h_source);
   if (data) {
     send_packet(listen_socket, if_name, &data->mac, &data->default_entry,
                 sizeof(data->default_entry));
-    printf("sent default:%s\n", data->default_entry);
+    //   printf("sent default:%s\n", data->default_entry);
   } else {
     printf("failed to find entry for mac address: ");
     print_mac(frame.hdr.h_source);
@@ -250,11 +250,9 @@ void listen_default(int listen_socket, char *if_name) {
         if (events[i].events != EPOLLHUP) {
           switch (events[i].data.u32) {
           case LISTEN_SOCKET:
-            printf("LISTEN_SOCKET\n");
             process_listen_socket(listen_socket, if_name);
             break;
           case CONFIG_FIFO:
-            printf("CONFIG_SOCKET\n");
             process_config_fd(config_fifo);
             break;
           }
@@ -285,11 +283,9 @@ int main(int argc, char *argv[]) {
       process_config_fd(f);
       close(f);
     } else if (strcmp(argv[curr_arg], "-r") == 0) {
-      printf("sending request \n");
       request_default(sock, if_name);
       break;
     } else if (strcmp(argv[curr_arg], "-l") == 0) {
-      printf("listening for request \n");
       listen_default(sock, if_name);
       break;
     } else {
