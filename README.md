@@ -15,13 +15,13 @@ Run the container as root:
 sudo docker compose up -d
 ```
 ## Home Assistant
-Edit the home assistant auto discovery payload shown in the Home Assistant configuration section.\
+Edit the home assistant auto discovery payload shown in the [Home Assistant configuration section](#home-assistant-1).\
 Minify it at https://jsonformatter.org/ \
-Submit it to the home assistant discovery topic, as shown in the Home Assistant configuration section.
+Submit it to the home assistant discovery topic, as shown in the [Home Assistant configuration section](#home-assistant-1).
 ## GRUB module
 Download the latest grub module from the releases.\
 Currently, it is only built for x86_64-efi.\
-Follow the remote-bootselect.mod configuration section.
+Follow the [remote-bootselect.mod installation section](#installation).
 
 # Documentation
 
