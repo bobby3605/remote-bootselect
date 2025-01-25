@@ -3,7 +3,7 @@ This program enables remotely setting the default boot option in grub.\
 There is a server program and a grub module.
 
 # Quickstart
-The docker container has the server daemon and MQTT integration built in.\
+The docker container has the server daemon and MQTT integration built in.
 ## Server
 Pull the server container:
 ```
@@ -33,14 +33,14 @@ This program listens for broadcast packets with a custom ethertype.\
 It must run as root because it operates on L2, so it reads and sends raw packets.\
 Usage:
 ``` 
-./remote-bootselect-server interface_name listen
+./remote-bootselect-server -i interface_name -l
 ```
 It also has the capability to request default data. This is useful for debugging.
 ```
-./remote-bootselect-server interface_name request
+./remote-bootselect-server -i interface_name -r
 ```
 ### Configuration:
-You can pass a config file to remote-bootselect-server with the '-c' flag
+You can pass a config file to remote-bootselect-server with the '-c' flag.\
 Add entries to the file following this example:
 ```
 0a:1b:2c:3d:4e:5f default_entry
