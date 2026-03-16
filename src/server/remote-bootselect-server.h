@@ -8,12 +8,12 @@
 enum EPOLL_DATA { LISTEN_SOCKET, CONFIG_FIFO };
 
 struct RequestFrame {
-  struct ethhdr hdr;
+    struct ethhdr hdr;
 };
 
 struct DataFrame {
-  struct ethhdr hdr;
-  char default_entry[DEFAULT_ENTRY_MAX_LENGTH];
+    struct ethhdr hdr;
+    char default_entry[DEFAULT_ENTRY_MAX_LENGTH];
 };
 
 #endif // REMOTE_DEFAULT_UTIL_H_
