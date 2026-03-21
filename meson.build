@@ -6,6 +6,10 @@ add_project_arguments('-Og', '-g', language : 'cpp')
 
 srcs = [
 'src/server/main.cpp',
+'src/server/common.cpp',
+'src/server/ConfigHandler.cpp',
+'src/server/EventHandler.cpp',
+'src/server/RequestHandler.cpp',
 ]
 executable('remote-bootselect', srcs)
 
