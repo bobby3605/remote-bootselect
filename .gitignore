@@ -1,2 +1,7 @@
+flake.lock
+.direnv/
 build/
-container-build/
+result
+.cache/
+.envrc
+container-build
