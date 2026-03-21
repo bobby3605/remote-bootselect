@@ -46,7 +46,7 @@ void RequestHandler::create_data_socket() {
 }
 
 void RequestHandler::get_if_info(std::string const& interface) {
-    ifreq ifr;
+    ifreq ifr = {};
     if (interface.size() < sizeof(ifr.ifr_name)) {
         memcpy(ifr.ifr_name, interface.data(), interface.size());
         ifr.ifr_name[interface.size()] = 0;

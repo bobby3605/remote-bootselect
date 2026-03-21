@@ -27,6 +27,9 @@ void ConfigHandler::create_socket(std::string const& path) {
     if (config_socket != -1) {
         sockaddr_un addr = {};
         addr.sun_family = AF_UNIX;
+        if (path.size() + 1 > sizeof(addr.sun_path)) {
+            std::cout << "error: size of config socket path is > " << sizeof(addr.sun_path) << std::endl;
+        }
         std::memcpy(addr.sun_path, path.data(), path.size());
         addr.sun_path[path.size()] = '\0';
         // ensure that the socket no longer exists
