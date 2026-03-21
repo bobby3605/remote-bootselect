@@ -3,6 +3,7 @@
 #include <array>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <linux/if_packet.h>
 #include <net/if.h>
@@ -76,6 +77,9 @@ int create_config_listener(std::string path) {
         addr.sun_family = AF_UNIX;
         std::memcpy(addr.sun_path, path.data(), path.size());
         addr.sun_path[path.size()] = '\0';
+        // ensure that the socket no longer exists
+        // linux doesn't automatically clean up unix sockets
+        unlink(path.data());
         if (bind(config_socket, (sockaddr*)&addr, sizeof(addr)) == -1) {
             std::cout << "warning: failed to bind socket: " << path << std::endl;
         }
@@ -148,15 +152,15 @@ void handle_requests(int epfd, int config_socket, int data_socket) {
             if (events[i].data.fd == config_socket) {
                 size_t bufsize = 0;
                 if (ioctl(config_socket, FIONREAD, &bufsize) < 0) {
-                    printf("failed to get buffer size for config socket: %s\n", strerror(errno));
-                    exit(errno);
+                    std::cout << "failed to get buffer size for config socket: " << strerror(errno) << std::endl;
+                    std::exit(errno);
                 }
                 std::string buffer;
                 buffer.resize(bufsize);
                 int config_size = read(config_socket, buffer.data(), bufsize);
                 if (config_size == -1) {
-                    printf("config recv failed: %s\n", strerror(errno));
-                    exit(errno);
+                    std::cout << "config recv failed: " << strerror(errno) << std::endl;
+                    std::exit(errno);
                 }
                 std::stringstream stream(buffer);
                 process_config(stream);
@@ -174,13 +178,13 @@ void handle_requests(int epfd, int config_socket, int data_socket) {
                 std::memcpy(data.hdr.h_dest, source_frame.hdr.h_source, sizeof(MAC));
                 std::memcpy(data.hdr.h_source, hwaddr.sa_data, sizeof(MAC));
 
-                MAC src_addr;
+                MAC src_addr = {};
                 std::memcpy(src_addr.data(), source_frame.hdr.h_source, src_addr.size());
                 std::string& entry = defaultEntries[src_addr];
                 data.entry_length = entry.size();
 
-                std::memcpy(data.entry, entry.data(), data.entry_length);
                 if (entry.length() > 0) {
+                    std::memcpy(data.entry, entry.data(), data.entry_length);
                     sockaddr_ll addr = {};
                     addr.sll_family = AF_PACKET;
                     addr.sll_ifindex = ifindex;
@@ -188,14 +192,18 @@ void handle_requests(int epfd, int config_socket, int data_socket) {
                     addr.sll_protocol = htons(ETH_P_ALL);
                     memcpy(addr.sll_addr, source_frame.hdr.h_dest, ETHER_ADDR_LEN);
                     if (sendto(data_socket, &data, sizeof(data), 0, (const sockaddr*)&addr, (socklen_t)sizeof(addr)) == -1) {
-                        printf("failed to send packet: %s\n", strerror(errno));
+                        std::cout << "failed to send packet: " << strerror(errno) << std::endl;
                     }
                 } else {
                     std::cout << "failed to find entry for MAC: ";
-                    for (auto const& b : src_addr) {
-                        std::cout << b << ":";
+                    for (size_t i = 0; i < src_addr.size(); i++) {
+                        std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)src_addr[i];
+                        if (i != src_addr.size() - 1) {
+                            std::cout << ":";
+                        }
                     }
-                    std::cout << std::endl;
+
+                    std::cout << std::dec << std::endl;
                 }
             }
         }
@@ -208,16 +216,16 @@ void get_if_info(int sock, std::string if_name, int* index, struct sockaddr* hwa
         memcpy(ifr.ifr_name, if_name.data(), if_name.size());
         ifr.ifr_name[if_name.size()] = 0;
     } else {
-        printf("bad length when getting interface info: %s\n", strerror(errno));
+        std::cout << "bad length when getting interface info: " << strerror(errno) << std::endl;
     }
 
     if (ioctl(sock, SIOCGIFINDEX, &ifr) == -1) {
-        printf("failed to get interface %s index: %s\n", if_name.data(), strerror(errno));
+        std::cout << "failed to get interface " << if_name.data() << " " << strerror(errno) << std::endl;
     }
     *index = ifr.ifr_ifindex;
 
     if (ioctl(sock, SIOCGIFHWADDR, &ifr) == -1) {
-        printf("failed to get interface mac address: %s\n", strerror(errno));
+        std::cout << "failed to get interface mac address: " << strerror(errno) << std::endl;
     }
     memcpy(hwaddr->sa_data, ifr.ifr_hwaddr.sa_data, sizeof(ifr.ifr_hwaddr.sa_data));
 }
