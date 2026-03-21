@@ -11,6 +11,6 @@ class ConfigHandler {
 
   private:
     int config_socket = -1;
-    void create_socket(std::string path);
+    void create_socket(std::string const& path);
     std::function<void(void)> handler;
 };

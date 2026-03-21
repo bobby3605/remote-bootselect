@@ -22,7 +22,11 @@ void EventHandler::register_socket(int socket, std::function<void(void)>& f) {
     epoll_event event;
     event.events = EPOLLIN;
     event.data.ptr = &f;
-    epoll_ctl(epfd, EPOLL_CTL_ADD, socket, &event);
+    int r = epoll_ctl(epfd, EPOLL_CTL_ADD, socket, &event);
+    if (r == -1) {
+        std::cout << "error: failed to add socket to epoll: " << strerror(errno) << std::endl;
+        exit(errno);
+    }
 }
 
 void EventHandler::handle_events() {

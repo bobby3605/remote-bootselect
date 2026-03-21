@@ -28,7 +28,11 @@ RequestHandler::RequestHandler(EventHandler& eventHandler, std::string const& in
     get_if_info(interface);
 }
 
-RequestHandler::~RequestHandler() { close(data_socket); }
+RequestHandler::~RequestHandler() {
+    if (data_socket != -1) {
+        close(data_socket);
+    }
+}
 
 void RequestHandler::create_data_socket() {
     data_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -67,7 +71,15 @@ void RequestHandler::get_if_info(std::string const& interface) {
 void RequestHandler::process_socket() {
 
     RequestFrame source_frame = {};
-    recv(data_socket, &source_frame, sizeof(source_frame), 0);
+    int r = recv(data_socket, &source_frame, sizeof(source_frame), 0);
+    if (r == -1) {
+        std::cout << "warning: failed to receive data: " << strerror(errno) << std::endl;
+        return;
+    }
+    if (r != sizeof(source_frame)) {
+        std::cout << "warning: wrong size frame on data socket: " << r << std::endl;
+        return;
+    }
     // check that it is a broadcast packet
     if (memcmp(source_frame.hdr.h_dest, ether_broadcast_addr.data(), ether_broadcast_addr.size()) != 0) {
         return;
@@ -98,7 +110,9 @@ void RequestHandler::process_socket() {
         addr.sll_ifindex = ifindex;
         addr.sll_halen = ETHER_ADDR_LEN;
         addr.sll_protocol = htons(ETH_P_ALL);
-        // sll_addr doesn't matter, because it's set in the header
+        // NOTE:
+        // sll_addr probably doesn't matter, because it's set in the header
+        std::memcpy(addr.sll_addr, data.hdr.h_dest, sizeof(MAC));
         if (sendto(data_socket, &data, send_size, 0, (const sockaddr*)&addr, (socklen_t)sizeof(addr)) == -1) {
             std::cout << "failed to send packet: " << strerror(errno) << std::endl;
         }

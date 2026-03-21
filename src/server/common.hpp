@@ -24,7 +24,7 @@ struct __attribute__((packed)) DataFrame {
 void drain_socket(int socket);
 
 bool parse_mac(std::istream& config, MAC& mac);
-void print_mac(MAC& mac);
+void print_mac(MAC const& mac);
 
 namespace std {
 template <> struct hash<MAC> {

@@ -22,7 +22,7 @@ ConfigHandler::~ConfigHandler() {
     }
 }
 
-void ConfigHandler::create_socket(std::string path) {
+void ConfigHandler::create_socket(std::string const& path) {
     config_socket = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
     if (config_socket != -1) {
         sockaddr_un addr = {};
@@ -71,11 +71,10 @@ void ConfigHandler::process_config(std::istream& config) {
             std::getline(config, entry);
             if (config.fail()) {
                 std::cout << "warning: configuration failure on line: " << line << std::endl;
-                ++line;
             } else {
                 defaultEntries[mac] = entry;
-                ++line;
             }
         }
+        ++line;
     }
 }

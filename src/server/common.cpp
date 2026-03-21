@@ -44,7 +44,7 @@ bool parse_mac(std::istream& config, MAC& mac) {
     return false;
 }
 
-void print_mac(MAC& mac) {
+void print_mac(MAC const& mac) {
     for (size_t i = 0; i < mac.size(); i++) {
         std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)mac[i];
         if (i != mac.size() - 1) {
