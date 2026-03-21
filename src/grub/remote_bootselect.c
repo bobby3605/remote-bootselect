@@ -103,9 +103,9 @@ static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd __attribu
 
 static grub_extcmd_t cmd;
 
-GRUB_MOD_INIT(remote - bootselect) {
+GRUB_MOD_INIT(remote_bootselect) {
     cmd =
-        grub_register_extcmd("remote-bootselect", grub_cmd_remote_bootselect, 0, 0, N_("Get the default boot option from the network."), 0);
+        grub_register_extcmd("remote_bootselect", grub_cmd_remote_bootselect, 0, 0, N_("Get the default boot option from the network."), 0);
 }
 
-GRUB_MOD_FINI(remote - bootselect) { grub_unregister_extcmd(cmd); }
+GRUB_MOD_FINI(remote_bootselect) { grub_unregister_extcmd(cmd); }

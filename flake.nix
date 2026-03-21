@@ -26,6 +26,7 @@
         ];
 
         buildInputs = with pkgs; [
+          grub2
         ];
 
         buildDir = "build";
