@@ -7,7 +7,8 @@
 EventHandler::EventHandler() {
     epfd = epoll_create1(0);
     if (epfd == -1) {
-        std::cout << "warning: epoll_create failed" << strerror(errno) << std::endl;
+        std::cout << "error: epoll_create failed" << strerror(errno) << std::endl;
+        exit(errno);
     }
 }
 

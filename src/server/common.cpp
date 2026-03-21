@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include <arpa/inet.h>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <linux/filter.h>
 
@@ -41,4 +42,14 @@ bool parse_mac(std::istream& config, MAC& mac) {
     }
 
     return false;
+}
+
+void print_mac(MAC& mac) {
+    for (size_t i = 0; i < mac.size(); i++) {
+        std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)mac[i];
+        if (i != mac.size() - 1) {
+            std::cout << ":";
+        }
+    }
+    std::cout << std::dec;
 }

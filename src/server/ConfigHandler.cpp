@@ -33,26 +33,28 @@ void ConfigHandler::create_socket(std::string path) {
         // linux doesn't automatically clean up unix sockets
         unlink(path.data());
         if (bind(config_socket, (sockaddr*)&addr, sizeof(addr)) == -1) {
-            std::cout << "warning: failed to bind socket: " << path << std::endl;
+            std::cout << "error: failed to bind socket: " << path << " : " << strerror(errno) << std::endl;
+            exit(errno);
         }
     } else {
-        std::cout << "warning: failed to create config socket" << std::endl;
+        std::cout << "error: failed to create config socket" << std::endl;
+        exit(errno);
     }
 }
 
 void ConfigHandler::process_socket() {
     size_t bufsize = 0;
     if (ioctl(config_socket, FIONREAD, &bufsize) < 0) {
-        std::cout << "failed to get buffer size for config socket: " << strerror(errno) << std::endl;
-        std::exit(errno);
+        std::cout << "warning: failed to get buffer size for config socket: " << strerror(errno) << std::endl;
+        return;
     }
     if (bufsize > 0) {
         std::string buffer;
         buffer.resize(bufsize);
         int config_size = read(config_socket, buffer.data(), bufsize);
         if (config_size == -1) {
-            std::cout << "config recv failed: " << strerror(errno) << std::endl;
-            std::exit(errno);
+            std::cout << "warning: config recv failed: " << strerror(errno) << std::endl;
+            return;
         }
         std::stringstream stream(buffer);
         process_config(stream);
@@ -63,14 +65,16 @@ void ConfigHandler::process_config(std::istream& config) {
     MAC mac;
     std::string entry;
     entry.reserve(MAX_ENTRY_LENGTH);
+    size_t line = 0;
     while (!config.eof()) {
         if (parse_mac(config, mac)) {
             std::getline(config, entry);
             if (config.fail()) {
-                std::cout << "warning: configuration failure" << std::endl;
-                return;
+                std::cout << "warning: configuration failure on line: " << line << std::endl;
+                ++line;
             } else {
                 defaultEntries[mac] = entry;
+                ++line;
             }
         }
     }

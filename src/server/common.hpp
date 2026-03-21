@@ -24,13 +24,14 @@ struct __attribute__((packed)) DataFrame {
 void drain_socket(int socket);
 
 bool parse_mac(std::istream& config, MAC& mac);
+void print_mac(MAC& mac);
 
 namespace std {
 template <> struct hash<MAC> {
     std::size_t operator()(const MAC& mac) const {
         std::size_t h = 0;
         for (auto b : mac) {
-            b = (h << 8) ^ b;
+            h = (h << 8) ^ b;
         }
         return h;
     }

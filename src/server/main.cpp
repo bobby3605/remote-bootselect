@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
                 configHandler.process_config(config);
                 config.close();
             } else {
-                std::cout << "failed to open config file: " << argv[i] << std::endl;
+                std::cout << "warning: failed to open config file: " << argv[i] << std::endl;
             }
         }
     }
