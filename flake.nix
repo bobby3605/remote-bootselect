@@ -27,6 +27,12 @@
 
         buildInputs = with pkgs; [
           grub2
+          autoconf
+          automake
+          libtool
+          gettext
+          bison
+          flex
         ];
 
         buildDir = "build";

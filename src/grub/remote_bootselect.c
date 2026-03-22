@@ -14,11 +14,11 @@
 
 #define BOOTSELECT_ETHERTYPE 0x7184
 
-struct etherhdr {
+struct __attribute__((packed)) etherhdr {
     grub_uint8_t dst[6];
     grub_uint8_t src[6];
     grub_uint16_t type;
-} GRUB_PACKED;
+};
 
 struct RequestFrame {
     struct etherhdr hdr;
@@ -29,27 +29,28 @@ struct RequestFrame {
 // compatible
 GRUB_MOD_LICENSE("GPLv3+");
 
-static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd __attribute__((unused)), int argc __attribute__((unused)),
-                                             char **args) {
+static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd __attribute__((unused)), int argc, char **args) {
+    grub_dl_load("efinet");
     if (grub_net_cards == NULL) {
-        grub_printf("Failed to find any network cards. Did you call insmod efinet ?\n");
+        grub_printf("Failed to find any network cards.\n");
         return 1;
     }
 
+    int card_idx = argc > 1 ? atoi_1(args[argc]) : 0;
+
     struct grub_net_card *card;
     int i = 0;
-    int found_card = 0;
+    bool found_card = false;
     FOR_NET_CARDS(card) {
-        if (i == atoi_1(args[0])) {
-            found_card = 1;
+        if (i == card_idx) {
+            found_card = true;
             break;
         } else {
             ++i;
         }
     }
-    if (found_card == 0) {
-        grub_printf("Failed to find any network card: %d. Did you call insmod "
-                    "efinet ?\n");
+    if (!found_card) {
+        grub_printf("Failed to find network card: %d\n", card_idx);
         return 1;
     }
 
@@ -81,23 +82,45 @@ static grub_err_t grub_cmd_remote_bootselect(grub_extcmd_context_t cmd __attribu
     // send frame
     card->driver->send(card, request_nb);
 
-    grub_netbuff_free(request_nb);
-
     struct grub_net_buff *response;
     struct etherhdr hdr = {0};
     const grub_uint64_t timeout_ms = 1000;
     grub_uint64_t limit_time = grub_get_time_ms() + timeout_ms;
     do {
         response = card->driver->recv(card);
-        hdr = *(struct etherhdr *)response->data;
+        if (response) {
+            hdr = *(struct etherhdr *)response->data;
+        }
         if (limit_time < grub_get_time_ms()) {
             grub_printf("timeout waiting for response\n");
+            grub_netbuff_free(request_nb);
             return 1;
         }
+        card->driver->send(card, request_nb);
+        grub_millisleep(10);
     } while (hdr.type != ethertype);
+    grub_netbuff_free(request_nb);
+    grub_uint64_t respSize = response->tail - response->data;
+    if (respSize < sizeof(struct etherhdr) + sizeof(grub_uint8_t)) {
+        grub_printf("size mismatch on response\n");
+        return 1;
+    }
     grub_netbuff_pull(response, sizeof(struct etherhdr));
-    grub_printf("got default:%s\n", (char *)response->data);
-    grub_env_set("default", (char *)response->data);
+    grub_uint8_t length = *(grub_uint8_t *)response->data;
+    grub_netbuff_pull(response, sizeof(grub_uint8_t));
+    if ((response->tail - response->data) < length) {
+        grub_printf("size mismatch on response entry\n");
+        return 1;
+    }
+
+    char *entry = (char *)grub_malloc(length + sizeof(char));
+    grub_memcpy(entry, response->data, length);
+    grub_netbuff_free(response);
+    entry[length] = '\0';
+
+    grub_printf("got default:%s\n", entry);
+    grub_env_set("default", entry);
+    grub_free(entry);
     return 0;
 }
 

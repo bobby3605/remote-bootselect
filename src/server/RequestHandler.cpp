@@ -104,6 +104,7 @@ void RequestHandler::process_socket() {
         data.entry_length = entry.size();
         std::memcpy(data.entry, entry.data(), data.entry_length);
         size_t send_size = offsetof(DataFrame, entry) + data.entry_length;
+        std::cout << "send_size: " << send_size << std::endl;
 
         sockaddr_ll addr = {};
         addr.sll_family = AF_PACKET;
@@ -115,6 +116,11 @@ void RequestHandler::process_socket() {
         std::memcpy(addr.sll_addr, data.hdr.h_dest, sizeof(MAC));
         if (sendto(data_socket, &data, send_size, 0, (const sockaddr*)&addr, (socklen_t)sizeof(addr)) == -1) {
             std::cout << "failed to send packet: " << strerror(errno) << std::endl;
+        }
+        {
+            std::cout << "sent " << entry << " to: ";
+            print_mac(src_addr);
+            std::cout << std::endl;
         }
     } else {
         std::cout << "failed to find entry for MAC: ";
