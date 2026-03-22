@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include <string>
 #include <sys/socket.h>
+#include <unordered_map>
 
 class RequestHandler {
   public:
@@ -17,4 +18,7 @@ class RequestHandler {
     int ifindex = -1;
     void get_if_info(std::string const& interface);
     void process_socket();
+    void process_request();
+    void process_menuentries(size_t const& bufsize);
+    std::unordered_map<std::string, std::string> menuentries;
 };

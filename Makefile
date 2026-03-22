@@ -6,7 +6,7 @@ build-dir:
 	mkdir -p build/
 
 clean:
-	rm -rf build/
+	rm -rf build/remote_bootselect.mod
 
 bootstrap-grub:
 	cd grub; echo "module = {name = remote_bootselect;common = remote_bootselect/remote_bootselect.c;};" >> grub-core/Makefile.core.def; ./bootstrap;

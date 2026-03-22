@@ -6,3 +6,4 @@ result
 .envrc
 container-build
 config
+mnt

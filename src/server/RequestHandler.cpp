@@ -5,6 +5,7 @@
 #include <iostream>
 #include <linux/if_packet.h>
 #include <net/if.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -70,6 +71,19 @@ void RequestHandler::get_if_info(std::string const& interface) {
 
 void RequestHandler::process_socket() {
 
+    size_t bufsize = 0;
+    if (ioctl(data_socket, FIONREAD, &bufsize) < 0) {
+        std::cout << "warning: failed to get buffer size for data socket: " << strerror(errno) << std::endl;
+        return;
+    }
+    if (bufsize == sizeof(RequestFrame)) {
+        process_request();
+    } else {
+        process_menuentries(bufsize);
+    }
+}
+
+void RequestHandler::process_request() {
     RequestFrame source_frame = {};
     int r = recv(data_socket, &source_frame, sizeof(source_frame), 0);
     if (r == -1) {
@@ -127,4 +141,61 @@ void RequestHandler::process_socket() {
         print_mac(src_addr);
         std::cout << std::endl;
     }
+}
+
+std::optional<std::string> read_strnlen(char*& strbuf, int& remaining_len) {
+    if (remaining_len == 0) {
+        std::cout << "warning: got 0 remaining_length on read_strnlen" << std::endl;
+        return {};
+    }
+    int len = strnlen(strbuf, remaining_len);
+    if (len != 0 && remaining_len >= (len + 1)) {
+        // + 1 for null terminator
+        remaining_len -= (len + 1);
+    } else {
+        std::cout << "warning: got bad length on read_strnlen" << std::endl;
+        return {};
+    }
+    std::string str(strbuf);
+    strbuf += (len + 1);
+    return str;
+}
+
+void RequestHandler::process_menuentries(size_t const& bufsize) {
+    char* entries = (char*)std::malloc(bufsize);
+    int r = recv(data_socket, entries, bufsize, 0);
+    if (r == -1) {
+        std::cout << "warning: failed to receive menuentries: " << strerror(errno) << std::endl;
+        std::free(entries);
+        return;
+    } else if (r != (int)bufsize) {
+        std::cout << "warning: unexpected menuentries receive size: " << r << std::endl;
+        std::free(entries);
+        return;
+    }
+    ethhdr hdr;
+    std::memcpy(&hdr, entries, sizeof(hdr));
+
+    char* entry = entries + sizeof(hdr);
+    int remaining_len = bufsize - sizeof(hdr);
+
+    while (remaining_len != 0) {
+        auto id = read_strnlen(entry, remaining_len);
+        auto title = read_strnlen(entry, remaining_len);
+
+        if (id.has_value() && title.has_value()) {
+            menuentries[id.value()] = title.value();
+        } else {
+            std::cout << "warning: process_menuentries: invalid id or title read" << std::endl;
+            std::free(entries);
+            return;
+        }
+    }
+
+    std::cout << "got menuentries:" << std::endl;
+    for (auto const& entry : menuentries) {
+        std::cout << "id: " << entry.first << " ";
+        std::cout << "title: " << entry.second << std::endl;
+    }
+    std::free(entries);
 }

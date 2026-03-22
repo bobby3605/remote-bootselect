@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  remote-bootselect-build:
+    build:
+      context: .
+      dockerfile: Dockerfile-build
+    container_name: remote-bootselect-build
+    volumes:
+      - ./container-build:/app/build
+      - .:/app
+    working_dir: /app
+    tty: true
