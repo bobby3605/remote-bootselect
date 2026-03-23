@@ -11,7 +11,7 @@
 ConfigHandler::ConfigHandler(EventHandler& eventHandler) {
     create_socket("/tmp/remote-bootselect.sock");
     if (config_socket != -1) {
-        handler = std::bind(&ConfigHandler::process_socket, this);
+        handler = std::bind(&ConfigHandler::process_socket, this, std::placeholders::_1);
         eventHandler.register_socket(config_socket, handler);
     }
 }
@@ -45,7 +45,7 @@ void ConfigHandler::create_socket(std::string const& path) {
     }
 }
 
-void ConfigHandler::process_socket() {
+void ConfigHandler::process_socket(uint32_t events) {
     size_t bufsize = 0;
     if (ioctl(config_socket, FIONREAD, &bufsize) < 0) {
         std::cout << "warning: failed to get buffer size for config socket: " << strerror(errno) << std::endl;

@@ -7,3 +7,5 @@ result
 container-build
 config
 mnt
+run-mqtt.sh
+run.sh

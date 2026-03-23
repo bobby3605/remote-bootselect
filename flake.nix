@@ -33,6 +33,8 @@
           gettext
           bison
           flex
+          mosquitto
+#          mosquitto.dev
         ];
 
         buildDir = "build";

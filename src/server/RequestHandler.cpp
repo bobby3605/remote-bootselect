@@ -10,17 +10,22 @@
 #include <unistd.h>
 
 std::array<sock_filter, 4> filter_code = {
-    sock_filter{0x28, 0, 0, 0x0000000c}, {0x15, 0, 1, ETHERTYPE}, {0x6, 0, 0, sizeof(DataFrame)}, {0x6, 0, 0, 0x00000000}};
+    sock_filter{0x28, 0, 0, 0x0000000c       },
+    {0x15, 0, 1, ETHERTYPE        },
+    {0x6,  0, 0, sizeof(DataFrame)},
+    {0x6,  0, 0, 0x00000000       }
+};
 
 const sock_fprog filter = {
     .len = filter_code.size(),
     .filter = &filter_code.at(0),
 };
 
-RequestHandler::RequestHandler(EventHandler& eventHandler, std::string const& interface) {
+RequestHandler::RequestHandler(EventHandler& eventHandler, MQTTHandler& mqttHandler, std::string const& interface)
+    : mqttHandler(mqttHandler) {
     create_data_socket();
     if (data_socket != -1) {
-        handler = std::bind(&RequestHandler::process_socket, this);
+        handler = std::bind(&RequestHandler::process_socket, this, std::placeholders::_1);
         eventHandler.register_socket(data_socket, handler);
     } else {
         std::cout << "error: failed to create data socket: " << strerror(errno) << std::endl;
@@ -69,7 +74,7 @@ void RequestHandler::get_if_info(std::string const& interface) {
     memcpy(hwaddr.data(), ifr.ifr_hwaddr.sa_data, hwaddr.size());
 }
 
-void RequestHandler::process_socket() {
+void RequestHandler::process_socket(uint32_t events) {
 
     size_t bufsize = 0;
     if (ioctl(data_socket, FIONREAD, &bufsize) < 0) {
@@ -162,23 +167,22 @@ std::optional<std::string> read_strnlen(char*& strbuf, int& remaining_len) {
 }
 
 void RequestHandler::process_menuentries(size_t const& bufsize) {
-    char* entries = (char*)std::malloc(bufsize);
-    int r = recv(data_socket, entries, bufsize, 0);
+    std::vector<char> entries(bufsize);
+    int r = recv(data_socket, entries.data(), bufsize, 0);
     if (r == -1) {
         std::cout << "warning: failed to receive menuentries: " << strerror(errno) << std::endl;
-        std::free(entries);
         return;
     } else if (r != (int)bufsize) {
         std::cout << "warning: unexpected menuentries receive size: " << r << std::endl;
-        std::free(entries);
         return;
     }
     ethhdr hdr;
-    std::memcpy(&hdr, entries, sizeof(hdr));
+    std::memcpy(&hdr, entries.data(), sizeof(hdr));
 
-    char* entry = entries + sizeof(hdr);
+    char* entry = entries.data() + sizeof(hdr);
     int remaining_len = bufsize - sizeof(hdr);
 
+    std::unordered_map<std::string, std::string> menuentries;
     while (remaining_len != 0) {
         auto id = read_strnlen(entry, remaining_len);
         auto title = read_strnlen(entry, remaining_len);
@@ -187,15 +191,11 @@ void RequestHandler::process_menuentries(size_t const& bufsize) {
             menuentries[id.value()] = title.value();
         } else {
             std::cout << "warning: process_menuentries: invalid id or title read" << std::endl;
-            std::free(entries);
             return;
         }
     }
 
-    std::cout << "got menuentries:" << std::endl;
-    for (auto const& entry : menuentries) {
-        std::cout << "id: " << entry.first << " ";
-        std::cout << "title: " << entry.second << std::endl;
-    }
-    std::free(entries);
+    MAC mac = {};
+    std::memcpy(mac.data(), hdr.h_source, mac.size());
+    mqttHandler.upload_menuentries(mac, menuentries);
 }
