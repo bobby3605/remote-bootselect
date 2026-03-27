@@ -1,4 +1,5 @@
 #pragma once
+#include "ConfigHandler.hpp"
 #include "EventHandler.hpp"
 #include "common.hpp"
 #include <mosquitto.h>
@@ -8,10 +9,11 @@ void message_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg);
 
 class MQTTHandler {
   public:
-    MQTTHandler(EventHandler& eventHandler, std::string const& host, uint16_t const& port, std::string const& username,
-                std::string const& password);
+    MQTTHandler(EventHandler& eventHandler, ConfigHandler& configHandler, std::string const& host, uint16_t const& port,
+                std::string const& username, std::string const& password);
     ~MQTTHandler();
     void upload_menuentries(MAC const& source, std::unordered_map<std::string, std::string> const& menuentries);
+    ConfigHandler& configHandler;
 
   private:
     const std::string mqtt_topic = "remote_bootselect";

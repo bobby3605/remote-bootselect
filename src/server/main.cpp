@@ -44,14 +44,8 @@ int main(int argc, char* argv[]) {
     if (ifname.size() == 0) {
         std::cout << "error: interface option missing" << std::endl;
     } else {
-        MQTTHandler mqttHandler(eventHandler, host, port, username, password);
+        MQTTHandler mqttHandler(eventHandler, configHandler, host, port, username, password);
         RequestHandler requestHandler(eventHandler, mqttHandler, ifname);
-        MAC mac = {0x34, 0x5A, 0x60, 0x0D, 0x20, 0x39};
-        std::unordered_map<std::string, std::string> tmp;
-        tmp["nixos"] = "NixOS";
-        tmp["osprober-efi-0671-5AC9"] = "Windows Boot Manager (on /dev/nvme0n1p1)";
-        tmp["test"] = "test2";
-        mqttHandler.upload_menuentries(mac, tmp);
         eventHandler.handle_events();
     }
 }

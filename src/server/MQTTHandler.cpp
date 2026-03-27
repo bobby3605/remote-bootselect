@@ -1,5 +1,6 @@
 #include "MQTTHandler.hpp"
 #include "mosquitto.h"
+#include "src/server/ConfigHandler.hpp"
 #include <iostream>
 #include <json.hpp>
 #include <stdio.h>
@@ -8,8 +9,9 @@
 
 using json = nlohmann::json;
 
-MQTTHandler::MQTTHandler(EventHandler& eventHandler, std::string const& host, uint16_t const& port, std::string const& username,
-                         std::string const& password) {
+MQTTHandler::MQTTHandler(EventHandler& eventHandler, ConfigHandler& configHandler, std::string const& host, uint16_t const& port,
+                         std::string const& username, std::string const& password)
+    : configHandler(configHandler) {
     mosquitto_lib_init();
     mqtt = mosquitto_new(NULL, true, this);
     mosquitto_username_pw_set(mqtt, username.c_str(), password.c_str());
@@ -77,7 +79,7 @@ void MQTTHandler::upload_menuentries(MAC const& mac, std::unordered_map<std::str
     }
 
     std::string payload_str = payload.dump();
-    mosquitto_publish(mqtt, NULL, discovery_topic.c_str(), 0, "", 0, true);
+    //    mosquitto_publish(mqtt, NULL, discovery_topic.c_str(), 0, "", 0, true);
 
     mosquitto_publish(mqtt, NULL, discovery_topic.c_str(), payload_str.size(), payload_str.c_str(), 0, true);
 }
@@ -98,6 +100,6 @@ void MQTTHandler::process_timer(uint32_t events) {
 }
 
 void message_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg) {
-    std::string config_message((char*)msg->payload);
-    std::cout << "config_message: " << config_message << std::endl;
+    std::stringstream config_message((char*)msg->payload);
+    reinterpret_cast<MQTTHandler*>(obj)->configHandler.process_config(config_message);
 }
