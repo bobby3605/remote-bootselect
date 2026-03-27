@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     ConfigHandler configHandler(eventHandler);
     std::string ifname;
     std::string host;
-    uint16_t port;
+    uint16_t port = -1;
     std::string username;
     std::string password;
     std::string configFile;
