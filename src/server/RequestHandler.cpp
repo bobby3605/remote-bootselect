@@ -97,7 +97,7 @@ void RequestHandler::process_socket(uint32_t /*events*/) {
     }
     // NOTE:
     // handling the case where the L2 packet was extended to 60 bytes
-    if (bufsize == sizeof(RequestFrame) || (bufsize > sizeof(RequestFrame) && frame[sizeof(RequestFrame) + 1] == '\0')) {
+    if (bufsize == sizeof(RequestFrame) || (bufsize > sizeof(RequestFrame) && frame[sizeof(RequestFrame)] == '\0')) {
         process_request(frame);
     } else {
         process_menuentries(frame);
