@@ -11,7 +11,8 @@ using json = nlohmann::json;
 
 void message_callback(mosquitto* /*mqtt*/, void* obj, const mosquitto_message* msg) {
     if (msg->payloadlen > 0) {
-        std::stringstream config_message((char*)msg->payload);
+        std::string tmp((char*)msg->payload, msg->payloadlen);
+        std::stringstream config_message(tmp);
         reinterpret_cast<MQTTHandler*>(obj)->configHandler.process_config(config_message);
     }
 }
@@ -64,6 +65,9 @@ MQTTHandler::~MQTTHandler() {
     mosquitto_disconnect(mqtt);
     mosquitto_destroy(mqtt);
     mosquitto_lib_cleanup();
+    if (timer_fd != -1) {
+        close(timer_fd);
+    }
 }
 
 void MQTTHandler::get_state(std::string const& host, int const& port, std::string const& username, std::string const& password) {
