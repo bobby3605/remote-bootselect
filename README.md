@@ -50,20 +50,18 @@ This allows for dynamically changing the default entry of a server.
 ## remote-bootselect.mod
 This is the grub module that will communicate with the server and set the default entry.
 ### Installation:
-Install the module into your grub boot folder and update grub:
+Install the module into your grub boot folder:
 ``` 
 cp remote-bootselect.mod /boot/grub/x86_64-efi/remote-bootselect.mod
 ```
-Edit ```/boot/grub/grub.cfg``` to run remote-bootselect.mod
-Example:
-Near the top of the file:
+Copy the ```00-remote_bootselect``` and ```99-remote_bootselect_export``` files to /etc/grub.d/
 ```
-insmod remote_bootselect
-remote_bootselect
+cp src/grub/00-remote_bootselect /etc/grub.d/
+cp src/grub/99-remote_bootselect /etc/grub.d/
 ```
-At the bottom of the file, after all the menuentries:
+update grub
 ```
-remote_bootselect_export
+grub-mkconfig -o /boot/grub/grub.cfg
 ```
 ## Building:
 ### remote-bootselect
