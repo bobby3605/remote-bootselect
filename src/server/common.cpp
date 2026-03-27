@@ -6,6 +6,7 @@
 #include <linux/filter.h>
 
 // https://natanyellin.com/posts/ebpf-filtering-done-right/
+/*
 void drain_socket(int socket) {
     sock_filter zero_bytecode = BPF_STMT(BPF_RET | BPF_K, 0);
     sock_fprog zero_program = {1, &zero_bytecode};
@@ -21,6 +22,7 @@ void drain_socket(int socket) {
         }
     }
 }
+*/
 
 bool parse_mac(std::istream& config, MAC& mac) {
     char c[2];

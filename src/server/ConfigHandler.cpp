@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -46,7 +47,7 @@ void ConfigHandler::create_socket(std::string const& path) {
     }
 }
 
-void ConfigHandler::process_socket(uint32_t events) {
+void ConfigHandler::process_socket(uint32_t /*events*/) {
     size_t bufsize = 0;
     if (ioctl(config_socket, FIONREAD, &bufsize) < 0) {
         std::cout << "warning: failed to get buffer size for config socket: " << strerror(errno) << std::endl;

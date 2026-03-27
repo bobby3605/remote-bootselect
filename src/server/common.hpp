@@ -21,7 +21,7 @@ struct __attribute__((packed)) DataFrame {
     char entry[MAX_ENTRY_LENGTH];
 };
 
-void drain_socket(int socket);
+// void drain_socket(int socket);
 
 bool parse_mac(std::istream& config, MAC& mac);
 void print_mac(MAC const& mac);

@@ -9,7 +9,7 @@
 
 using json = nlohmann::json;
 
-void message_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg) {
+void message_callback(mosquitto* /*mqtt*/, void* obj, const mosquitto_message* msg) {
     if (msg->payloadlen > 0) {
         std::stringstream config_message((char*)msg->payload);
         reinterpret_cast<MQTTHandler*>(obj)->configHandler.process_config(config_message);
@@ -132,7 +132,7 @@ void MQTTHandler::process_socket(uint32_t events) {
     }
 }
 
-void MQTTHandler::process_timer(uint32_t events) {
+void MQTTHandler::process_timer(uint32_t /*events*/) {
     uint64_t exp;
     read(timer_fd, &exp, sizeof(exp));
     mosquitto_loop_misc(mqtt);

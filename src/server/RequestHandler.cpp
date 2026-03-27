@@ -9,6 +9,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+/*
 std::array<sock_filter, 4> filter_code = {
     sock_filter{0x28, 0, 0, 0x0000000c       },
     {0x15, 0, 1, ETHERTYPE        },
@@ -20,6 +21,7 @@ const sock_fprog filter = {
     .len = filter_code.size(),
     .filter = &filter_code.at(0),
 };
+*/
 
 RequestHandler::RequestHandler(EventHandler& eventHandler, MQTTHandler& mqttHandler, std::string const& interface)
     : mqttHandler(mqttHandler) {
@@ -41,13 +43,17 @@ RequestHandler::~RequestHandler() {
 }
 
 void RequestHandler::create_data_socket() {
-    data_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    data_socket = socket(AF_PACKET, SOCK_RAW, htons(ETHERTYPE));
     if (data_socket != -1) {
+        /*
         drain_socket(data_socket);
         if (setsockopt(data_socket, SOL_SOCKET, SO_ATTACH_FILTER, &filter, sizeof(filter)) != 0) {
             std::cout << "error: failed to attach data socket filter: " << strerror(errno) << std::endl;
             exit(errno);
         }
+        */
+    } else {
+        std::cout << "error: failed to create L2 socket: " << strerror(errno) << std::endl;
     }
 }
 
@@ -74,8 +80,7 @@ void RequestHandler::get_if_info(std::string const& interface) {
     memcpy(hwaddr.data(), ifr.ifr_hwaddr.sa_data, hwaddr.size());
 }
 
-void RequestHandler::process_socket(uint32_t events) {
-
+void RequestHandler::process_socket(uint32_t /*events*/) {
     size_t bufsize = 0;
     if (ioctl(data_socket, FIONREAD, &bufsize) < 0) {
         std::cout << "warning: failed to get buffer size for data socket: " << strerror(errno) << std::endl;
