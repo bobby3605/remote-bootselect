@@ -18,7 +18,7 @@ class RequestHandler {
     int ifindex = -1;
     void get_if_info(std::string const& interface);
     void process_socket(uint32_t events);
-    void process_request();
-    void process_menuentries(size_t const& bufsize);
+    void process_request(std::vector<unsigned char> const& frame);
+    void process_menuentries(std::vector<unsigned char> const& frame);
     MQTTHandler& mqttHandler;
 };

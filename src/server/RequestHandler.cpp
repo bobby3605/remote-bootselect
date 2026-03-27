@@ -86,24 +86,27 @@ void RequestHandler::process_socket(uint32_t /*events*/) {
         std::cout << "warning: failed to get buffer size for data socket: " << strerror(errno) << std::endl;
         return;
     }
-    if (bufsize == sizeof(RequestFrame)) {
-        process_request();
+    std::vector<unsigned char> frame(bufsize);
+    int r = recv(data_socket, frame.data(), bufsize, 0);
+    if (r == -1) {
+        std::cout << "warning: failed to receive frame: " << strerror(errno) << std::endl;
+        return;
+    } else if (r != (int)bufsize) {
+        std::cout << "warning: unexpected frame receive size: " << r << std::endl;
+        return;
+    }
+    // NOTE:
+    // handling the case where the L2 packet was extended to 60 bytes
+    if (bufsize == sizeof(RequestFrame) || (bufsize > sizeof(RequestFrame) && frame[sizeof(RequestFrame) + 1] == '\0')) {
+        process_request(frame);
     } else {
-        process_menuentries(bufsize);
+        process_menuentries(frame);
     }
 }
 
-void RequestHandler::process_request() {
+void RequestHandler::process_request(std::vector<unsigned char> const& frame) {
     RequestFrame source_frame = {};
-    int r = recv(data_socket, &source_frame, sizeof(source_frame), 0);
-    if (r == -1) {
-        std::cout << "warning: failed to receive data: " << strerror(errno) << std::endl;
-        return;
-    }
-    if (r != sizeof(source_frame)) {
-        std::cout << "warning: wrong size frame on data socket: " << r << std::endl;
-        return;
-    }
+    std::memcpy(&source_frame, frame.data(), sizeof(source_frame));
     // check that it is a broadcast packet
     if (memcmp(source_frame.hdr.h_dest, ether_broadcast_addr.data(), ether_broadcast_addr.size()) != 0) {
         return;
@@ -147,7 +150,7 @@ void RequestHandler::process_request() {
     }
 }
 
-std::optional<std::string> read_strnlen(char*& strbuf, int& remaining_len) {
+std::optional<std::string> read_strnlen(const char* strbuf, int& remaining_len) {
     if (remaining_len == 0) {
         std::cout << "warning: got 0 remaining_length on read_strnlen" << std::endl;
         return {};
@@ -157,7 +160,7 @@ std::optional<std::string> read_strnlen(char*& strbuf, int& remaining_len) {
         // + 1 for null terminator
         remaining_len -= (len + 1);
     } else {
-        std::cout << "warning: got bad length on read_strnlen" << std::endl;
+        std::cout << "warning: got bad length on read_strnlen: " << len << std::endl;
         return {};
     }
     std::string str(strbuf);
@@ -165,21 +168,12 @@ std::optional<std::string> read_strnlen(char*& strbuf, int& remaining_len) {
     return str;
 }
 
-void RequestHandler::process_menuentries(size_t const& bufsize) {
-    std::vector<char> entries(bufsize);
-    int r = recv(data_socket, entries.data(), bufsize, 0);
-    if (r == -1) {
-        std::cout << "warning: failed to receive menuentries: " << strerror(errno) << std::endl;
-        return;
-    } else if (r != (int)bufsize) {
-        std::cout << "warning: unexpected menuentries receive size: " << r << std::endl;
-        return;
-    }
+void RequestHandler::process_menuentries(std::vector<unsigned char> const& frame) {
     ethhdr hdr;
-    std::memcpy(&hdr, entries.data(), sizeof(hdr));
+    std::memcpy(&hdr, frame.data(), sizeof(hdr));
 
-    char* entry = entries.data() + sizeof(hdr);
-    int remaining_len = bufsize - sizeof(hdr);
+    const char* entry = reinterpret_cast<const char*>(frame.data()) + sizeof(hdr);
+    int remaining_len = frame.size() - sizeof(hdr);
 
     std::unordered_map<std::string, std::string> menuentries;
     while (remaining_len != 0) {
