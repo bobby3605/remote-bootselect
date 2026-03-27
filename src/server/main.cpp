@@ -18,18 +18,13 @@ int main(int argc, char* argv[]) {
     uint16_t port;
     std::string username;
     std::string password;
+    std::string configFile;
     for (int i = 0; i + 1 < argc; i++) {
         std::string const& arg = argv[i];
         if (arg.compare("-i") == 0) {
             ifname = std::string(argv[++i]);
         } else if (arg.compare("-c") == 0) {
-            std::ifstream config(argv[++i], std::ios::in);
-            if (config.is_open()) {
-                configHandler.process_config(config);
-                config.close();
-            } else {
-                std::cout << "warning: failed to open config file: " << argv[i] << std::endl;
-            }
+            configFile = argv[++i];
         } else if (arg.compare("-host") == 0) {
             host = std::string(argv[++i]);
         } else if (arg.compare("-port") == 0) {
@@ -46,6 +41,19 @@ int main(int argc, char* argv[]) {
     } else {
         MQTTHandler mqttHandler(eventHandler, configHandler, host, port, username, password);
         RequestHandler requestHandler(eventHandler, mqttHandler, ifname);
+
+        configHandler.mqttHandler = &mqttHandler;
+
+        if (configFile.size() > 0) {
+            std::ifstream config(configFile, std::ios::in);
+            if (config.is_open()) {
+                configHandler.process_config(config);
+                config.close();
+            } else {
+                std::cout << "warning: failed to open config file: " << configFile << std::endl;
+            }
+        }
+
         eventHandler.handle_events();
     }
 }

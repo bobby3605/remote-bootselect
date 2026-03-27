@@ -1,4 +1,5 @@
 #include "ConfigHandler.hpp"
+#include "MQTTHandler.hpp"
 #include "common.hpp"
 #include <arpa/inet.h>
 #include <cstring>
@@ -76,6 +77,7 @@ void ConfigHandler::process_config(std::istream& config) {
                 std::cout << "warning: configuration failure on line: " << line << std::endl;
             } else {
                 defaultEntries[mac] = entry;
+                if (mqttHandler) mqttHandler->publish_state(mac, entry);
             }
         }
         ++line;

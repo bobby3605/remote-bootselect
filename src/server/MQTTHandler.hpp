@@ -14,10 +14,12 @@ class MQTTHandler {
     ~MQTTHandler();
     void upload_menuentries(MAC const& source, std::unordered_map<std::string, std::string> const& menuentries);
     ConfigHandler& configHandler;
+    void publish_state(MAC const& mac, std::string const& entry);
+    void get_state(std::string const& host, int const& port, std::string const& username, std::string const& password);
 
   private:
     const std::string mqtt_topic = "remote_bootselect";
-    const std::string discovery_topic = "homeassistant/device/remote-bootselect/config";
+    const std::string discovery_topic = "homeassistant/device/remote_bootselect/config";
     mosquitto* mqtt;
     int mqtt_socket = -1;
     int timer_fd = -1;

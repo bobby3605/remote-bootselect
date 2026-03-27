@@ -7,4 +7,3 @@ services:
       MQTT_HOST: ""
       MQTT_USER: ""
       MQTT_PASS: ""
-      MQTT_TOPIC: "remote-bootselect"

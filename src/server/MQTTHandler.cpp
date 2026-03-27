@@ -9,6 +9,20 @@
 
 using json = nlohmann::json;
 
+void message_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg) {
+    if (msg->payloadlen > 0) {
+        std::stringstream config_message((char*)msg->payload);
+        reinterpret_cast<MQTTHandler*>(obj)->configHandler.process_config(config_message);
+    }
+}
+
+int state_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg) {
+    message_callback(mqtt, obj, msg);
+    // FIXME:
+    // This doesn't really work, it just gets the first message then returns (if there even is a message)
+    return 1;
+}
+
 MQTTHandler::MQTTHandler(EventHandler& eventHandler, ConfigHandler& configHandler, std::string const& host, uint16_t const& port,
                          std::string const& username, std::string const& password)
     : configHandler(configHandler) {
@@ -52,35 +66,60 @@ MQTTHandler::~MQTTHandler() {
     mosquitto_lib_cleanup();
 }
 
+void MQTTHandler::get_state(std::string const& host, int const& port, std::string const& username, std::string const& password) {
+    // FIXME:
+    // Don't use this
+    // MQTT doesn't have a way to say "get all retained messages under this wildcard"
+    // or a way to query which topics exist under a wildcard
+    // or even an easy way to put a timeout on these helper functions
+    // I can make my own with a timeout, but it's not that important
+    std::string topic = mqtt_topic + "/state/+";
+    mosquitto_subscribe_callback(state_callback, this, topic.c_str(), 0, host.c_str(), port, NULL, 0, true, username.c_str(),
+                                 password.c_str(), NULL, NULL);
+}
+
 void MQTTHandler::upload_menuentries(MAC const& mac, std::unordered_map<std::string, std::string> const& menuentries) {
+
+    json options = {};
+    json id_to_title = {};
+    json title_to_id = {};
+    for (const auto& [id, title] : menuentries) {
+        options.push_back(title);
+        id_to_title[id] = title;
+        title_to_id[title] = id;
+    }
+
     // clang-format off
     json payload = {
         {"dev", {
-            {"ids", "remote-bootselect"},
+            {"ids", "remote_bootselect"},
             {"name", "Remote Bootselect"}}
         },
         {"o", {
-              {"name", "remote-bootselect"},
+              {"name", "remote_bootselect"},
               {"url", "https://github.com/bobby3605/remote-bootselect/"}}
         },
         {"cmps", {}}
     };
-    char source[18];
-    snprintf(source, sizeof(source), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    // clang-format on
-    for (const auto& [id, title] : menuentries) {
-        payload["cmps"][id] = {
-            {"p",             "button"                      },
-            {"unique_id",     id                            },
-            {"name",          title                         },
-            {"command_topic", mqtt_topic                    },
-            {"payload_press", std::string(source) + " " + id}
-        };
-    }
+    char source_tmp[18];
+    snprintf(source_tmp, sizeof(source_tmp), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    std::string source(source_tmp);
+
+    std::string command_template = "{% set map = " + title_to_id.dump(0) + " %}" + source + " {{ map[value] }}";
+    std::string value_template = "{% set map = " + id_to_title.dump(0) + " %}{{ map[value] }}";
+
+    payload["cmps"][source] = {
+    {"p", "select"},
+    {"name", source},
+    {"options", options},
+    {"unique_id", source},
+    {"command_topic", mqtt_topic},
+    {"command_template", command_template},
+    {"state_topic", mqtt_topic + "/state/" + source},
+    {"value_template", value_template}
+    };
 
     std::string payload_str = payload.dump();
-    //    mosquitto_publish(mqtt, NULL, discovery_topic.c_str(), 0, "", 0, true);
-
     mosquitto_publish(mqtt, NULL, discovery_topic.c_str(), payload_str.size(), payload_str.c_str(), 0, true);
 }
 
@@ -99,7 +138,16 @@ void MQTTHandler::process_timer(uint32_t events) {
     mosquitto_loop_misc(mqtt);
 }
 
-void message_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg) {
-    std::stringstream config_message((char*)msg->payload);
-    reinterpret_cast<MQTTHandler*>(obj)->configHandler.process_config(config_message);
+void MQTTHandler::publish_state(MAC const& mac, std::string const& entry){
+
+    char source_tmp[18];
+    snprintf(source_tmp, sizeof(source_tmp), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    std::string source(source_tmp);
+
+    std::string topic = mqtt_topic + "/state/" + source;
+
+    // TODO:
+    // subscribe to this once on startup
+    mosquitto_publish(mqtt, NULL, topic.c_str(), entry.size(), entry.c_str(), 0, true);
 }
+
