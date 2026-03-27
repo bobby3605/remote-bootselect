@@ -150,7 +150,7 @@ void RequestHandler::process_request(std::vector<unsigned char> const& frame) {
     }
 }
 
-std::optional<std::string> read_strnlen(const char* strbuf, int& remaining_len) {
+std::optional<std::string> read_strnlen(const char*& strbuf, int& remaining_len) {
     if (remaining_len == 0) {
         std::cout << "warning: got 0 remaining_length on read_strnlen" << std::endl;
         return {};
