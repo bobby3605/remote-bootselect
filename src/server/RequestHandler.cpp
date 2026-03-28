@@ -176,7 +176,7 @@ void RequestHandler::process_menuentries(std::vector<unsigned char> const& frame
     int remaining_len = frame.size() - sizeof(hdr);
 
     std::unordered_map<std::string, std::string> menuentries;
-    while (remaining_len != 0) {
+    while (remaining_len != 0 && *entry != '\0') {
         auto id = read_strnlen(entry, remaining_len);
         auto title = read_strnlen(entry, remaining_len);
 
