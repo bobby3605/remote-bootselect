@@ -9,7 +9,7 @@ class ConfigHandler {
     ConfigHandler(EventHandler& eventHandler);
     ~ConfigHandler();
     void process_socket(uint32_t events);
-    void process_config(std::istream& config);
+    void process_config(std::istream& config, bool publish = true);
     MQTTHandler* mqttHandler = nullptr;
 
   private:

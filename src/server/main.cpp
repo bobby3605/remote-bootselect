@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     ConfigHandler configHandler(eventHandler);
     std::string ifname;
     std::string host;
-    uint16_t port = -1;
+    uint16_t port = 1883;
     std::string username;
     std::string password;
     std::string configFile;
@@ -43,6 +43,7 @@ int main(int argc, char* argv[]) {
         RequestHandler requestHandler(eventHandler, mqttHandler, ifname);
 
         configHandler.mqttHandler = &mqttHandler;
+        mqttHandler.get_state(host, port, username, password);
 
         if (configFile.size() > 0) {
             std::ifstream config(configFile, std::ios::in);

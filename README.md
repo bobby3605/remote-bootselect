@@ -35,6 +35,7 @@ Usage:
 ``` 
 ./remote-bootselect -i interface_name -host mqtt_host -port mqtt_port -user mqtt_user -pass mqtt_pass
 ```
+With MQTT integration, it will store and load the state from MQTT on startup
 ### Configuration:
 You can pass a config file to remote-bootselect-server with the '-c' flag.\
 Add entries to the file following this example:

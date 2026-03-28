@@ -1,11 +1,15 @@
 #include "MQTTHandler.hpp"
 #include "mosquitto.h"
 #include "src/server/ConfigHandler.hpp"
+#include <chrono>
+#include <climits>
 #include <iostream>
 #include <json.hpp>
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/timerfd.h>
+#include <thread>
+#include <unistd.h>
 
 using json = nlohmann::json;
 
@@ -17,11 +21,13 @@ void message_callback(mosquitto* /*mqtt*/, void* obj, const mosquitto_message* m
     }
 }
 
-int state_callback(mosquitto* mqtt, void* obj, const mosquitto_message* msg) {
-    message_callback(mqtt, obj, msg);
-    // FIXME:
-    // This doesn't really work, it just gets the first message then returns (if there even is a message)
-    return 1;
+void state_callback(mosquitto* /*mqtt*/, void* obj, const mosquitto_message* msg) {
+    if (msg->payloadlen > 0) {
+        std::string topic(msg->topic);
+        std::string entry((char*)msg->payload, msg->payloadlen);
+        std::stringstream config(topic + " " + entry);
+        reinterpret_cast<MQTTHandler*>(obj)->configHandler.process_config(config, false);
+    }
 }
 
 MQTTHandler::MQTTHandler(EventHandler& eventHandler, ConfigHandler& configHandler, std::string const& host, uint16_t const& port,
@@ -31,7 +37,7 @@ MQTTHandler::MQTTHandler(EventHandler& eventHandler, ConfigHandler& configHandle
     mqtt = mosquitto_new(NULL, true, this);
     mosquitto_username_pw_set(mqtt, username.c_str(), password.c_str());
     int r = mosquitto_connect(mqtt, host.c_str(), port, 60);
-    if (r) {
+    if (r != MOSQ_ERR_SUCCESS) {
         std::cout << "warning: could not connect to mqtt broker: " << r << std::endl;
     } else {
         mqtt_socket = mosquitto_socket(mqtt);
@@ -71,15 +77,23 @@ MQTTHandler::~MQTTHandler() {
 }
 
 void MQTTHandler::get_state(std::string const& host, int const& port, std::string const& username, std::string const& password) {
-    // FIXME:
-    // Don't use this
-    // MQTT doesn't have a way to say "get all retained messages under this wildcard"
-    // or a way to query which topics exist under a wildcard
-    // or even an easy way to put a timeout on these helper functions
-    // I can make my own with a timeout, but it's not that important
-    std::string topic = mqtt_topic + "/state/+";
-    mosquitto_subscribe_callback(state_callback, this, topic.c_str(), 0, host.c_str(), port, NULL, 0, true, username.c_str(),
-                                 password.c_str(), NULL, NULL);
+
+    mosquitto* mqtt_state = mosquitto_new(NULL, true, this);
+    mosquitto_username_pw_set(mqtt_state, username.c_str(), password.c_str());
+    int r = mosquitto_connect(mqtt_state, host.c_str(), port, 60);
+    if (r == MOSQ_ERR_SUCCESS) {
+        mosquitto_message_callback_set(mqtt_state, state_callback);
+        std::string topic(mqtt_topic + "/state/+");
+        r = mosquitto_subscribe(mqtt_state, NULL, topic.c_str(), 0);
+        if (r == MOSQ_ERR_SUCCESS) {
+            r = mosquitto_loop_start(mqtt_state);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            r = mosquitto_disconnect(mqtt_state);
+            r = mosquitto_loop_stop(mqtt_state, false);
+            if (r == MOSQ_ERR_SUCCESS) return;
+        }
+    }
+    std::cout << "warning: failed to get inital state" << std::endl;
 }
 
 void MQTTHandler::upload_menuentries(MAC const& mac, std::unordered_map<std::string, std::string> const& menuentries) {

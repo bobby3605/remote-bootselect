@@ -66,7 +66,7 @@ void ConfigHandler::process_socket(uint32_t /*events*/) {
     }
 }
 
-void ConfigHandler::process_config(std::istream& config) {
+void ConfigHandler::process_config(std::istream& config, bool publish) {
     MAC mac;
     std::string entry;
     entry.reserve(MAX_ENTRY_LENGTH);
@@ -78,7 +78,7 @@ void ConfigHandler::process_config(std::istream& config) {
                 std::cout << "warning: configuration failure on line: " << line << std::endl;
             } else {
                 defaultEntries[mac] = entry;
-                if (mqttHandler) mqttHandler->publish_state(mac, entry);
+                if (mqttHandler && publish) mqttHandler->publish_state(mac, entry);
             }
         }
         ++line;
