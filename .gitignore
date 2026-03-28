@@ -1,2 +1,12 @@
+flake.lock
+.direnv/
 build/
-container-build/
+result
+.cache/
+.envrc
+container-build
+config
+mnt
+run-mqtt.sh
+run.sh
+flush-mqtt.sh

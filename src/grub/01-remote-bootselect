@@ -1,6 +1,0 @@
-#!/bin/sh
-exec tail -n +3 $0
-
-insmod efinet
-insmod remote-bootselect
-remote-bootselect 0

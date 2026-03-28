@@ -1,0 +1,3 @@
+#!/bin/sh
+insmod remote_bootselect
+remote_bootselect_export

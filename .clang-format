@@ -9,4 +9,5 @@ Language: Cpp
 DerivePointerAlignment: false
 PointerAlignment: Left
 AllowShortIfStatementsOnASingleLine: true
+AlignArrayOfStructures: Left
 ---
